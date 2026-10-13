@@ -1,0 +1,106 @@
+name: Publish release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid VERSION: $VERSION" >&2
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. Nothing to publish."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate repository
+        if: steps.version.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ./scripts/validate.sh
+
+      - name: Build release archives
+        if: steps.version.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ steps.version.outputs.version }}"
+          NAME="minisoc-fail2ban-rules-v$VERSION"
+          STAGE="$RUNNER_TEMP/$NAME"
+
+          mkdir -p "$STAGE"
+
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            ./ "$STAGE/"
+
+          chmod +x \
+            "$STAGE/install/install.sh" \
+            "$STAGE/install/test.sh" \
+            "$STAGE/install/uninstall.sh" \
+            "$STAGE/scripts/validate.sh"
+
+          (
+            cd "$RUNNER_TEMP"
+            zip -qr "$GITHUB_WORKSPACE/$NAME.zip" "$NAME"
+            tar -czf "$GITHUB_WORKSPACE/$NAME.tar.gz" "$NAME"
+          )
+
+          sha256sum "$NAME.zip" "$NAME.tar.gz" > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "MiniSOC Fail2Ban Rules $TAG" \
+            --generate-notes \
+            "minisoc-fail2ban-rules-v$VERSION.zip" \
+            "minisoc-fail2ban-rules-v$VERSION.tar.gz" \
+            "SHA256SUMS.txt"
