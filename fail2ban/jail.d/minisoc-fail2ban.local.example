@@ -1,0 +1,17 @@
+[nginx-skanery]
+enabled = true
+filter = nginx-skanery
+logpath = /var/log/nginx/access.log
+backend = auto
+findtime = 300
+maxretry = 1
+bantime = 3600
+
+[nginx-dev-honeypot]
+enabled = true
+filter = nginx-dev-honeypot
+logpath = /var/log/nginx/access.log
+backend = auto
+findtime = 300
+maxretry = 1
+bantime = 3600
