@@ -150,6 +150,12 @@ If a legitimate request is matched, open an issue with:
 
 These rules are defensive. They are intended for administrators protecting systems they own or are authorized to operate.
 
+## Releases
+
+Releases are automated from the root `VERSION` file. Changing `VERSION` on `main` triggers validation, creates a `vX.Y.Z` tag, packages ZIP and tar.gz archives, generates SHA-256 checksums, and publishes a GitHub Release.
+
+See **[docs/RELEASING.md](docs/RELEASING.md)**.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
