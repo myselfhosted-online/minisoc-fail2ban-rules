@@ -69,14 +69,14 @@ Debian/Ubuntu with Nginx and Fail2Ban:
 ```bash
 git clone https://github.com/myselfhosted-online/minisoc-fail2ban-rules.git
 cd minisoc-fail2ban-rules
-sudo ./install/install.sh
-sudo ./install/test.sh
+sudo bash ./install/install.sh
+sudo bash ./install/test.sh
 ```
 
 Custom Nginx access log:
 
 ```bash
-sudo NGINX_LOG=/path/to/access.log ./install/install.sh
+sudo NGINX_LOG=/path/to/access.log bash ./install/install.sh
 ```
 
 The installer creates backups before touching existing project-managed files, validates Fail2Ban configuration, and rolls back if validation fails.
