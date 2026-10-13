@@ -1,0 +1,24 @@
+# MiniSOC signature database
+# Format: id|severity|category|regex
+# Keep exact/high-confidence indicators narrow.
+
+dotenv-basic|HIGH|secret|/(?:\.env)(?:$|[./_-])
+git-config|HIGH|repository|/\.git/config(?:$|\?)
+git-credentials|HIGH|credential|/\.git-credentials(?:$|\?)
+aws-credentials|HIGH|credential|/\.aws/(?:credentials|credentials\.bak)(?:$|\?)
+docker-config|HIGH|credential|/\.docker/config\.json(?:$|\?)
+docker-dotenv|HIGH|secret|/\.docker/\.env(?:$|\?)
+hellopress-filemanager|HIGH|wordpress-webshell|/wp-content/plugins/hellopress/wp_filemanager\.php(?:$|\?)
+wp-fgban13jx3|HIGH|wordpress-webshell|/wp-fgban13jx3\.php(?:$|\?)
+wp-blink|HIGH|wordpress-webshell|/wp-blink\.php(?:$|\?)
+wp-logis|HIGH|wordpress-webshell|/wp-logis\.php(?:$|\?)
+wp-content-admin|HIGH|wordpress-webshell|/wp-content/admin\.php(?:$|\?)
+wp-admin-js-index|HIGH|wordpress-webshell|/wp-admin/js/index\.php(?:$|\?)
+wp-css-campaign|HIGH|wordpress-webshell|/wp-css\.php(?:$|\?)
+wp-trbacks-campaign|HIGH|wordpress-webshell|/wp-trbacks\.php(?:$|\?)
+wp-ss-campaign|HIGH|wordpress-webshell|/wp-ss\.php(?:$|\?)
+
+# Context-only / medium-confidence examples
+wp-login-recon|MEDIUM|wordpress|/wp-login\.php(?:$|\?)
+wp-admin-recon|MEDIUM|wordpress|/wp-admin/(?:$|\?)
+wp-json-recon|MEDIUM|wordpress|/wp-json/?(?:$|\?)
