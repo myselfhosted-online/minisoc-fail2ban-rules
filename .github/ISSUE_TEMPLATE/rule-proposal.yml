@@ -1,0 +1,32 @@
+name: Rule proposal
+description: Propose a new defensive detection rule
+title: "[Rule] "
+labels: ["rule-proposal"]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Behavior
+      description: Describe the malicious or suspicious behavior.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Proposed severity
+      options: [HIGH, MEDIUM, INFO]
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Never include credentials, tokens, cookies or private data.
+    validations:
+      required: true
+  - type: textarea
+    id: fp
+    attributes:
+      label: False-positive considerations
+    validations:
+      required: true
