@@ -62,6 +62,22 @@ Nginx access logs
 
 Raw alerts from multiple jails can refer to the same burst. The project therefore separates **raw alerts** from **parent incidents** and correlates overlapping requests from the same source within a short time window.
 
+## Using these rules with Fail2Ban
+
+For the full installation, verification, troubleshooting, update, unban, and uninstall procedure, see **[docs/FAIL2BAN.md](docs/FAIL2BAN.md)**.
+
+The short version is:
+
+```bash
+git clone https://github.com/myselfhosted-online/minisoc-fail2ban-rules.git
+cd minisoc-fail2ban-rules
+sudo bash ./install/install.sh
+sudo fail2ban-client -t
+sudo fail2ban-client status
+sudo fail2ban-client status nginx-skanery
+sudo fail2ban-client status nginx-dev-honeypot
+```
+
 ## Quick install
 
 Debian/Ubuntu with Nginx and Fail2Ban:
