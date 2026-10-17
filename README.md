@@ -132,7 +132,7 @@ Do **not** trust a User-Agent string as authorization. Prefer authenticated mark
 
 The samples in this repository come from actual internet traffic hitting the operator's homelab. They may contain real source IP addresses and exact malicious request paths when those details are relevant to detection research. Secrets, authentication material, private application data, and unrelated personal information must never be published.
 
-See [docs/DATA-SOURCES.md](docs/DATA-SOURCES.md) and [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
+See [docs/DATA-SOURCES.md](docs/DATA-SOURCES.md), [docs/METHODOLOGY.md](docs/METHODOLOGY.md), and [docs/BENIGN-SCANNERS.md](docs/BENIGN-SCANNERS.md).
 
 ## False positives
 
