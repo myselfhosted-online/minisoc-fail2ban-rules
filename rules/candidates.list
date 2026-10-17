@@ -1,0 +1,7 @@
+# Signature candidates under review
+# Format:
+# id|state|category|regex|notes
+#
+# Candidates are evidence under review. They are NOT one-hit blocking policy.
+
+wp-content-wuhr9|REVIEW|wordpress-webshell|^/wp-content/wuhr9\.php(?:$|\?)|Observed after /wp-admin and /wp-login.php reconnaissance in a single burst. Strongly suspicious, but not yet promoted to a standalone HIGH blocking signature.
