@@ -3,5 +3,7 @@
 # id|state|category|regex|notes
 #
 # Candidates are evidence under review. They are NOT one-hit blocking policy.
-
-wp-content-wuhr9|REVIEW|wordpress-webshell|^/wp-content/wuhr9\.php(?:$|\?)|Observed after /wp-admin and /wp-login.php reconnaissance in a single burst. Strongly suspicious, but not yet promoted to a standalone HIGH blocking signature.
+#
+# Current state:
+# No pending candidates. /wp-content/wuhr9.php was promoted to an exact HIGH
+# WordPress webshell/backdoor-hunting signature in v1.1.1.
