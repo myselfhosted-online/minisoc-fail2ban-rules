@@ -24,3 +24,10 @@ behavior match -> classify normally -> authorization check
                                   +-> trusted: log/telemetry, no ban/report
                                   +-> untrusted: normal enforcement
 ```
+
+
+## Repository policy list
+
+Known benign/research patterns are tracked in `rules/benign-scanners.list`.
+
+The list distinguishes low-risk discovery (`SAFE_DISCOVERY`) from suspicious research probes that are exempt only when authorization is independently verified (`TRUSTED_ONLY`).
