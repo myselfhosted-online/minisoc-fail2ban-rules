@@ -20,5 +20,18 @@ This index summarizes reviewed real-world traffic observed by the myselfhosted.o
 | 2026-10-13 | 35.240.58.49 | Docker/AWS/dotenv discovery; repeat source | HIGH |
 | 2026-10-13 | 20.211.27.190 | WordPress webshell hunting | HIGH |
 | 2026-10-13 | 20.194.17.163 | WordPress webshell hunting | HIGH |
+| 2026-10-13 | 185.220.101.154 | WordPress recon + suspicious /wp-content/wuhr9.php candidate; Tor exit context only | HIGH (contextual) |
+| 2026-10-14 | 20.214.144.216 | HelloPress + repeated WordPress webshell/backdoor paths | HIGH |
+| 2026-10-16 | 20.196.193.222 | HelloPress file-manager hunting + WordPress theme/config probes | HIGH |
+
+## Authorized / benign regression cases
+
+The following are retained separately from malicious incidents:
+
+- 2026-10-18 — user-initiated Cloudflare Radar URL Scanner / agent-readiness checks;
+- `/.well-known/openid-configuration` with `AgentReadinessScanner/1.0` -> SAFE_DISCOVERY / INFO;
+- `/dev/injector%20php` with research scanner context -> TRUSTED_ONLY, requiring independently verified authorization.
+
+See [2026-10-18-authorized-url-scanner.md](2026-10-18-authorized-url-scanner.md).
 
 The full private MiniSOC dataset contains more telemetry than is appropriate to publish. Public samples are intentionally curated and sanitized.
