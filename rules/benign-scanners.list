@@ -1,0 +1,15 @@
+# Known benign/research scanner patterns
+# Format:
+# id|policy|ua_regex|path_regex|notes
+#
+# Policies:
+# SAFE_DISCOVERY   -> INFO only; do not ban/report for this request pattern.
+# TRUSTED_ONLY     -> suppress enforcement only when the scan is independently verified
+#                     as authorized/user-initiated (trusted marker/session/IP/mTLS etc.).
+#
+# IMPORTANT:
+# A User-Agent string alone is never authorization and must never override a HIGH
+# malicious signature such as /.env, /.git/config, cloud credentials, or known webshells.
+
+agent-readiness-openid|SAFE_DISCOVERY|AgentReadinessScanner/1\.0|^/\.well-known/openid-configuration(?:\?.*)?$|Standards/agent-readiness discovery observed during Cloudflare Radar URL Scanner checks.
+urlscan-secret-watcher-dev-injector|TRUSTED_ONLY|urlscan-secret-watcher/1\.0|^/dev/injector(?:%20| )php(?:\?.*)?$|Research probe observed during a user-initiated URL scan; allow only when independently correlated with an authorized scan.
