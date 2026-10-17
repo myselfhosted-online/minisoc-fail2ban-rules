@@ -12,9 +12,9 @@ test -s "$ROOT/fail2ban/filter.d/nginx-dev-honeypot.conf"
 
 grep -q 'Behavior is the indicator' "$ROOT/README.md"
 grep -q 'hellopress-filemanager|HIGH' "$ROOT/rules/signatures-v2.db"
-grep -q 'wp-css-campaign|HIGH' "$ROOT/rules/signatures-v2.db"
+grep -q 'wp-content-wuhr9|HIGH' "$ROOT/rules/signatures-v2.db"
+grep -q '/wp-content/wuhr9\\.php' "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
 grep -q 'agent-readiness-openid|SAFE_DISCOVERY' "$ROOT/rules/benign-scanners.list"
 grep -q 'urlscan-secret-watcher-dev-injector|TRUSTED_ONLY' "$ROOT/rules/benign-scanners.list"
-grep -q 'wp-content-wuhr9|REVIEW' "$ROOT/rules/candidates.list"
 
-echo "PASS: repository structure, blocking signatures, benign-scanner policy, and review candidates are present"
+echo "PASS: repository structure, active malicious signatures, benign-scanner policy, and review list are valid"
