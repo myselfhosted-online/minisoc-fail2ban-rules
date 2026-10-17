@@ -1,3 +1,4 @@
 203.0.113.10 - - [13/Oct/2026:12:00:00 +0200] "GET /.env HTTP/1.1" 404 153 "-" "Mozilla/5.0"
 203.0.113.11 - - [13/Oct/2026:12:00:01 +0200] "GET /.aws/credentials.bak HTTP/1.1" 404 153 "-" "Mozilla/5.0"
 203.0.113.12 - - [13/Oct/2026:12:00:02 +0200] "GET /wp-content/plugins/hellopress/wp_filemanager.php HTTP/1.1" 404 153 "-" "-"
+203.0.113.13 - - [13/Oct/2026:12:00:03 +0200] "GET /wp-content/wuhr9.php HTTP/1.1" 404 153 "-" "Mozilla/5.0"
