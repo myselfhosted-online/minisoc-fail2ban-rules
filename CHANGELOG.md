@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0 — 2026-10-18
+
+Detection-policy and regression update.
+
+- added explicit benign/research scanner handling with `SAFE_DISCOVERY` and `TRUSTED_ONLY` policies;
+- added Cloudflare Radar / agent-readiness regression cases to prevent benign discovery from becoming automatic bans;
+- added `rules/benign-scanners.list`;
+- added `rules/candidates.list` so suspicious paths can be reviewed without immediately becoming one-hit blocking rules;
+- added `/wp-content/wuhr9.php` as a review candidate rather than a confirmed shell signature;
+- expanded the curated incident index with reviewed 2026-10-13 through 2026-10-16 WordPress scanning campaigns;
+- documented detailed Fail2Ban installation, verification, troubleshooting, updating, unbanning, and uninstall procedures;
+- strengthened false-positive and authorized-scanner policy documentation;
+- extended benign regression fixtures and repository validation;
+- retained the principle that ASN, cloud provider, Tor status, country, and User-Agent are context rather than standalone ban reasons.
+
 ## 1.0.0 — 2026-10-13
 
 Initial public release.
