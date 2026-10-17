@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.1 — 2026-10-18
+
+Correction release.
+
+- promoted `/wp-content/wuhr9.php` from review-only status to an exact HIGH WordPress webshell/backdoor-hunting signature;
+- added the exact path to the active `nginx-skanery` Fail2Ban filter;
+- added a malicious regression fixture for `/wp-content/wuhr9.php`;
+- corrected the candidate list and validation so this path is no longer treated as pending review;
+- kept the distinction that the path is a high-confidence malicious probe indicator, not proof of a specific named PHP shell family.
+
 ## 1.1.0 — 2026-10-18
 
 Detection-policy and regression update.
