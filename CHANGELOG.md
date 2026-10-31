@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 — 2026-10-31
+
+Release retry for the reviewed v1.2.0 changes after the previous version bump did not produce a visible GitHub Release. No duplicate detection signatures added. Includes GitHub issue templates for bug reports, feature requests, and proposed signatures.
+
 ## 1.2.0 — 2026-10-31
 
 Focused October 2026 rule expansion after comparing incident evidence against v1.1.1.
