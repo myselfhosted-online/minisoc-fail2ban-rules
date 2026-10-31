@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible detection, installation, or validation problem
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "Please remove IPs, hostnames, credentials, tokens and private log data before submitting. For vulnerabilities, use the private security reporting channel described in SECURITY.md."
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "v1.2.0 or commit SHA"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Component
+      options:
+        - Fail2Ban filter
+        - MiniSOC signature
+        - Installer or updater
+        - Tests or CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: "Provide a minimal, sanitized example and exact commands."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: "OS, Nginx and Fail2Ban versions; omit sensitive details."
