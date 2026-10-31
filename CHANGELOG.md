@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 — 2026-10-31
+
+Focused October 2026 rule expansion after comparing incident evidence against v1.1.1.
+
+- added exact HIGH detection for `/.kube/config` and `/.git/credentials` in the signature database and relevant Fail2Ban filters;
+- retained existing `.env`, AWS, Docker and Git rules without duplicating previously covered paths;
+- added regression fixtures for new indicators and documented cross-jail incident deduplication;
+- kept Vite `@fs`, encoded traversal and NTFS ADS-like probes as review-only candidates pending decoding and false-positive tests;
+- treated ASN, IP location and User-Agent strictly as context; no IP-based bans were added.
+
 ## 1.1.1 — 2026-10-18
 
 Correction release.
