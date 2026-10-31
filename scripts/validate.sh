@@ -20,9 +20,9 @@ grep -q 'urlscan-secret-watcher-dev-injector|TRUSTED_ONLY' "$ROOT/rules/benign-s
 # October 2026 exact indicators must remain active and tested.
 grep -Fq 'git-internal-credentials|HIGH|credential|' "$ROOT/rules/signatures-v2.db"
 grep -Fq 'kube-config|HIGH|credential|' "$ROOT/rules/signatures-v2.db"
-grep -Fq '/\\.kube/config' "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
-grep -Fq '/\\.kube/config' "$ROOT/fail2ban/filter.d/nginx-dev-honeypot.conf"
-grep -Fq '/\\.git/(?:config|credentials)' "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
+grep -Fq '/\.kube/config' "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
+grep -Fq '/\.kube/config' "$ROOT/fail2ban/filter.d/nginx-dev-honeypot.conf"
+grep -Fq '/\.git/(?:config|credentials)' "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
 grep -Fq 'GET /.kube/config HTTP/1.1' "$ROOT/tests/fixtures/october-2026-new.log"
 grep -Fq 'GET /.git/credentials HTTP/1.1' "$ROOT/tests/fixtures/october-2026-new.log"
 
