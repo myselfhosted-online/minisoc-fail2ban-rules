@@ -7,3 +7,8 @@
 # Current state:
 # No pending candidates. /wp-content/wuhr9.php was promoted to an exact HIGH
 # WordPress webshell/backdoor-hunting signature in v1.1.1.
+
+# October 2026: keep framework-dependent/encoded probes under review until tested.
+vite-fs-env|REVIEW|secret|/@fs/[^ ?]*\.env(?:\?|$)|Vite file access probe; verify request-target parsing and legitimate use
+encoded-dotdot-slash|REVIEW|traversal|\.\.%2[fF]|Encoded traversal marker; context required, never standalone ban
+ntfs-ads-dotenv|REVIEW|secret|/\.env[^ ?]*::\$DATA|NTFS ADS-looking probe; validate decoding and escaping
