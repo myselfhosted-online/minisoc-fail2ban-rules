@@ -1,0 +1,44 @@
+name: New detection signature
+description: Propose a new malicious request indicator with sanitized evidence
+title: "[Signature] "
+body:
+  - type: markdown
+    attributes:
+      value: "Check rules/signatures-v2.db and rules/candidates.list before proposing a path already covered. Never submit secrets, real credentials, private hostnames, cookies, or full sensitive logs."
+  - type: input
+    id: target
+    attributes:
+      label: Request path or behavior
+      placeholder: "/example/path"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: "Use documentation IP ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) in examples."
+    validations:
+      required: true
+  - type: textarea
+    id: existing
+    attributes:
+      label: Existing rules checked
+      description: "Which signatures or candidates have you checked?"
+    validations:
+      required: true
+  - type: textarea
+    id: false_positives
+    attributes:
+      label: False-positive risks and benign test cases
+    validations:
+      required: true
+  - type: dropdown
+    id: confidence
+    attributes:
+      label: Proposed confidence
+      options:
+        - Review only
+        - Medium
+        - High (exact, high-confidence indicator)
+    validations:
+      required: true
