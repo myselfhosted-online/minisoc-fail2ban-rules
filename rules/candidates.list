@@ -12,3 +12,11 @@
 vite-fs-env|REVIEW|secret|/@fs/[^ ?]*\.env(?:\?|$)|Vite file access probe; verify request-target parsing and legitimate use
 encoded-dotdot-slash|REVIEW|traversal|\.\.%2[fF]|Encoded traversal marker; context required, never standalone ban
 ntfs-ads-dotenv|REVIEW|secret|/\.env[^ ?]*::\$DATA|NTFS ADS-looking probe; validate decoding and escaping
+
+# November 2026: context-only review; never one-hit blocking
+wp-json-enumeration|REVIEW|wordpress-recon|/(?:blog/|wp/|wordpress/|site/|news/)?wp-json/?(?:$|\?)|Suspicious only as a burst across installation prefixes
+wordpress-php-enumeration|REVIEW|wordpress-suspicious-php|/wp-(?:sanita|devirot|devirus|devisue|conflg|access)\.php(?:$|\?)|Correlate bursts; do not one-hit ban
+backup-env-family|REVIEW|env-backup-enumeration|/(?:\.env\.[0-9]+|env\.(?:bak|old|save))(?:$|\?)|Multiple backup probes required for escalation
+wp-maljum-php|REVIEW|wordpress-suspicious-php|/wp-content/maljum\.php(?:$|\?)|Observed 2026-11-15; unconfirmed webshell
+wp-track3-php|REVIEW|wordpress-suspicious-php|/wp-track3\.php(?:$|\?)|Observed 2026-11-15; unconfirmed webshell
+wp-sample-php|REVIEW|wordpress-suspicious-php|/wp-sample\.php(?:$|\?)|Observed 2026-11-15; unconfirmed webshell
