@@ -156,6 +156,20 @@ Releases are automated from the root `VERSION` file. Changing `VERSION` on `main
 
 See **[docs/RELEASING.md](docs/RELEASING.md)**.
 
+## Support the project
+
+If this project helps you manage your Fail2Ban rules, please consider giving the repository a ⭐ star on GitHub. It helps others discover the project.
+
+You can also support ongoing development with a small Monero (XMR) donation. Every contribution is appreciated, but completely optional.
+
+**Monero (XMR) address:**
+
+```text
+891i2HuM2Bg1Y54QfpphkCGZdhb3Mas8TZ3YUgGfH3MrRLiduKR2acsUWtcPxxhn72TF6fRd9WuTSDmt9m12DsanV725gQF
+```
+
+Please verify the full address before sending funds. Donations are voluntary and do not influence security recommendations or detection rules.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
