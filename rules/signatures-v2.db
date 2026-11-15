@@ -25,3 +25,11 @@ wp-ss-campaign|HIGH|wordpress-webshell|/wp-ss\.php(?:$|\?)
 wp-login-recon|MEDIUM|wordpress|/wp-login\.php(?:$|\?)
 wp-admin-recon|MEDIUM|wordpress|/wp-admin/(?:$|\?)
 wp-json-recon|MEDIUM|wordpress|/wp-json/?(?:$|\?)
+
+# November 2026: exact Git metadata and environment backup indicators
+git-head|HIGH|repository|/\.git/HEAD(?:$|\?)
+git-index|HIGH|repository|/\.git/index(?:$|\?)
+git-packed-refs|HIGH|repository|/\.git/packed-refs(?:$|\?)
+git-info-refs|HIGH|repository|/\.git/info/refs(?:$|\?)
+dotenv-numbered-backup|HIGH|secret|/\.env\.[12](?:$|\?)
+env-backup|HIGH|secret|/env\.(?:bak|old)(?:$|\?)
