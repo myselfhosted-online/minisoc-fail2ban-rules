@@ -7,6 +7,9 @@ on:
       - main
     paths:
       - VERSION
+      - scripts/validate.sh
+      - tests/**
+      - .github/workflows/release.yml
 
 permissions:
   contents: write
