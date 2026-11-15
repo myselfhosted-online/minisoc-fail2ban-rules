@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — November 2026
+## 1.3.0 — 2026-11-15
 
 - Expanded exact HIGH Git metadata indicators: `/.git/HEAD`, `/.git/index`, `/.git/packed-refs`, `/.git/info/refs`.
 - Added narrow environment backup indicators for `/.env.1`, `/.env.2`, `/env.bak` and `/env.old`.
