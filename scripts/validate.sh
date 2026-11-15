@@ -28,5 +28,6 @@ grep -Fq 'GET /.kube/config HTTP/1.1' "$ROOT/tests/fixtures/october-2026-new.log
 grep -Fq 'GET /.git/credentials HTTP/1.1' "$ROOT/tests/fixtures/october-2026-new.log"
 
 python3 "$ROOT/tests/november-regression.py"
+python3 -m unittest discover -s "$ROOT/tests" -p 'test_safe_update.py' -v
 
 echo "PASS: repository structure, active malicious signatures, benign-scanner policy, and review list are valid"

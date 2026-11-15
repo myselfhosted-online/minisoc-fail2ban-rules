@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.1 — 2026-11-15
+
+Maintenance and bug-fix release focused on upgrade safety.
+
+- Prevent accidental overwriting of customized Fail2Ban filters by using known-version baselines and conservative merge handling.
+- Synchronize the active MiniSOC signature database by unique ID without replacing operator-defined signatures; reject conflicting definitions.
+- Detect local Fail2Ban filter overrides and unknown baselines before making changes.
+- Preserve existing jail configuration, including custom ban policy and log paths.
+- Add dry-run inspection, atomic file replacement, preflight validation, and automatic restoration after failed validation or reload.
+- Add ten installer regression tests and version-specific release notes.
+- Clarify that the MiniSOC application is not updated or restarted automatically.
+
+
 ## 1.3.0 — 2026-11-15
 
 - Expanded exact HIGH Git metadata indicators: `/.git/HEAD`, `/.git/index`, `/.git/packed-refs`, `/.git/info/refs`.

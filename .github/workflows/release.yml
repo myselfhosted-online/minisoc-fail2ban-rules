@@ -99,11 +99,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          NOTES_ARGS=(--generate-notes)
+          if [[ -s "docs/releases/$TAG.md" ]]; then
+            NOTES_ARGS=(--notes-file "docs/releases/$TAG.md")
+          fi
+
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "MiniSOC Fail2Ban Rules $TAG" \
-            --generate-notes \
+            "${NOTES_ARGS[@]}" \
             "minisoc-fail2ban-rules-v$VERSION.zip" \
             "minisoc-fail2ban-rules-v$VERSION.tar.gz" \
             "SHA256SUMS.txt"

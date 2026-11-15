@@ -62,6 +62,19 @@ Nginx access logs
 
 Raw alerts from multiple jails can refer to the same burst. The project therefore separates **raw alerts** from **parent incidents** and correlates overlapping requests from the same source within a short time window.
 
+## Safe updates (v1.3.1)
+
+For existing installations, review the plan before applying it:
+
+```bash
+sudo bash ./install/install.sh --dry-run
+sudo bash ./install/install.sh
+```
+
+The update preserves existing jail settings, supports conservative merges of known previous filter versions, and merges MiniSOC signatures by ID. Conflicts stop the upgrade without overwriting custom rules. Backups are created before applying changes. The MiniSOC application itself is not restarted.
+
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.1 release notes](docs/releases/v1.3.1.md).
+
 ## Using these rules with Fail2Ban
 
 For the full installation, verification, troubleshooting, update, unban, and uninstall procedure, see **[docs/FAIL2BAN.md](docs/FAIL2BAN.md)**.
