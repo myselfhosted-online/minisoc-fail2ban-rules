@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — November 2026
+
+- Expanded exact HIGH Git metadata indicators: `/.git/HEAD`, `/.git/index`, `/.git/packed-refs`, `/.git/info/refs`.
+- Added narrow environment backup indicators for `/.env.1`, `/.env.2`, `/env.bak` and `/env.old`.
+- Added review-only WordPress PHP, REST API and environment-backup candidate families, including November 15 observations.
+- Preserved the distinction between public rule definitions and production MiniSOC classification; production discrepancies require a separate application fix.
+- Documented optional GitHub stars and Monero support.
+
+
 ## 1.2.1 — 2026-10-31
 
 Release retry for the reviewed v1.2.0 changes after the previous version bump did not produce a visible GitHub Release. No duplicate detection signatures added. Includes GitHub issue templates for bug reports, feature requests, and proposed signatures.
