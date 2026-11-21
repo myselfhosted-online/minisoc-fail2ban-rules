@@ -62,7 +62,7 @@ Nginx access logs
 
 Raw alerts from multiple jails can refer to the same burst. The project therefore separates **raw alerts** from **parent incidents** and correlates overlapping requests from the same source within a short time window.
 
-## Safe updates (v1.3.1)
+## Safe updates (v1.3.1 and later)
 
 For existing installations, review the plan before applying it:
 
@@ -73,11 +73,11 @@ sudo bash ./install/install.sh
 
 The update preserves existing jail settings, supports conservative merges of known previous filter versions, and merges MiniSOC signatures by ID. Conflicts stop the upgrade without overwriting custom rules. Backups are created before applying changes. The MiniSOC application itself is not restarted.
 
-See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.1 release notes](docs/releases/v1.3.1.md).
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.2 release notes](docs/releases/v1.3.2.md).
 
-### Upcoming maintenance update (unreleased)
+### Maintenance update in v1.3.2
 
-The unreleased development candidate contains additional, conservative detection signatures, an audited uninstaller and a manual backup restoration utility. For updates using that code, run `--dry-run` first and inspect the plan, especially when local Fail2Ban filters or MiniSOC signature IDs have been customized.
+Version 1.3.2 includes additional, conservative detection signatures, an audited uninstaller and a manual backup restoration utility. Run `--dry-run` first and inspect the plan, especially when local Fail2Ban filters or MiniSOC signature IDs have been customized.
 
 For an already-created MiniSOC backup, first inspect it without making changes:
 
@@ -85,7 +85,7 @@ For an already-created MiniSOC backup, first inspect it without making changes:
 sudo python3 install/restore_backup.py /etc/fail2ban/minisoc-backup-YYYYMMDDTHHMMSSZ-PID --dry-run
 ```
 
-The restore command verifies its manifest, original hashes, and expected installed-file state before making any changes. See [the Fail2Ban operating guide](docs/FAIL2BAN.md) and [the draft maintenance notes](docs/releases/v1.3.2-DRAFT.md). A GitHub commit on a development branch is not a release or a production deployment.
+The restore command verifies its manifest, original hashes, and expected installed-file state before making any changes. See [the Fail2Ban operating guide](docs/FAIL2BAN.md) and [the v1.3.2 release notes](docs/releases/v1.3.2.md). Publishing this release does not automatically deploy it on a Debian server.
 
 ## Using these rules with Fail2Ban
 

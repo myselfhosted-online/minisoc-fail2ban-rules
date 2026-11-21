@@ -23,7 +23,7 @@ from dataclasses import dataclass
 ROOT = Path(__file__).resolve().parents[1]
 FILTERS = ('nginx-skanery.conf', 'nginx-dev-honeypot.conf')
 VERSIONS = ('v1.2.1', 'v1.3.0', 'v1.3.1')
-RELEASE = 'working-next-release'
+RELEASE = 'v1.3.2'
 
 class UpdateError(Exception):
     pass
@@ -93,7 +93,7 @@ def merge_db(previous: bytes | None, incoming: bytes, destination: Path, source:
     if not additions:
         return previous
     separator = b'' if previous.endswith(b'\n') else b'\n'
-    return previous + separator + b'\n# Added by MiniSOC future release\n' + ('\n'.join(additions) + '\n').encode('utf-8')
+    return previous + separator + b'\n# Added by MiniSOC v1.3.2\n' + ('\n'.join(additions) + '\n').encode('utf-8')
 
 
 def filter_merge(current: bytes | None, incoming: bytes, filename: str) -> tuple[bytes, str]:
