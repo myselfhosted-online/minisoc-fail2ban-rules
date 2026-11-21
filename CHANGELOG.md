@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.5 — unreleased compatibility fix (candidate)
+## 1.3.5 — 2026-11-22
 
 - Avoid an unnecessary Fail2Ban reload when only the external MiniSOC runtime signature database changes; leave all active jail configurations untouched.
 
@@ -10,7 +10,7 @@
 - Do not create the default Fail2Ban jail file when `nginx-skanery` or `nginx-dev-honeypot` already appears in another local jail configuration, avoiding a silent `maxretry`/`bantime` policy override.
 - Continue to preserve unknown customized Fail2Ban filters and to back up and automatically roll back changed files. A local database explicitly marked with the public four-column format is preserved for review rather than mixed with runtime rows.
 - Add regression tests modeled on the real Debian database structure, production loader behavior, duplicate categories, CRLF handling, regex pipes, idempotence, and rollback.
-- **No production deployment or GitHub Release until a real Debian dry-run is reviewed.**
+- Verified on the operator's Debian 13 system: real database-only update succeeded, Fail2Ban configuration test passed, a subsequent dry-run was idempotent, and the live MiniSOC correlator loaded all 88 runtime signatures across 19 categories with zero skipped entries.
 
 ## 1.3.4 — 2026-11-21
 

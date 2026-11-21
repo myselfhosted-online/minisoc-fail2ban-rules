@@ -217,7 +217,7 @@ The updater:
 1. checks for local filter overrides and unknown versions before modifying files;
 2. preserves existing jail settings such as `bantime`, `maxretry`, and `logpath`;
 3. merges filters conservatively against bundled v1.2.1/v1.3.0/v1.3.1/v1.3.2/v1.3.3 baselines; conflicting local changes require manual review;
-4. in the unreleased v1.3.5 candidate, converts public rule IDs to the MiniSOC runtime's three-column `category|severity|regex` format, keeps local entries unchanged, and skips already-present regex patterns;
+4. as of v1.3.5, converts public rule IDs to the MiniSOC runtime's three-column `category|severity|regex` format, keeps local entries unchanged, and skips already-present regex patterns;
 5. creates root-protected backups under `/etc/fail2ban/minisoc-backup-*`;
 6. validates and reloads Fail2Ban only when its filter or jail configuration changes; database-only MiniSOC updates deliberately skip Fail2Ban reload. On failure, changed files are restored, and Fail2Ban is reloaded again only if its configuration was changed.
 
@@ -225,13 +225,13 @@ If MiniSOC is not installed, its signature update is skipped. Set `MINISOC_SIGNA
 
 A safe update cannot automatically resolve all user-modified regexes. On conflict, **do not force an overwrite**: review the local rule and reconcile it with the new upstream filter.
 
-### Runtime-compatible MiniSOC database merge (unreleased v1.3.5 candidate)
+### Runtime-compatible MiniSOC database merge (v1.3.5)
 
 The real `/opt/minisoc/bin/minisoc-correlator.py` reads records with `kind, sev, pat = raw.split('|', 2)` and compiles patterns with `re.I`. Its input is `category|severity|regex`, **not** the public source file's `id|severity|category|regex` format. Repeating `secret`, `repository`, or `credential` in column one is valid. A `|` character within the regex is part of the pattern, not a new column.
 
-The v1.3.5 candidate validates and converts each bundled public rule to the runtime representation, preserves every existing local byte, and appends new regex patterns only when missing. Exact regex matches are skipped even if category/severity differ; the existing local classification takes precedence. The loader supports LOW, MEDIUM, HIGH, and CRITICAL, so unsupported new severities are rejected. Unknown or corrupted local file structures are preserved for manual review; no production deployment has been performed.
+The v1.3.5 updater validates and converts each bundled public rule to the runtime representation, preserves every existing local byte, and appends new regex patterns only when missing. Exact regex matches are skipped even if category/severity differ; the existing local classification takes precedence. The loader supports LOW, MEDIUM, HIGH, and CRITICAL, so unsupported new severities are rejected. Unknown or corrupted local file structures are preserved for manual review. The operator verified a successful database-only update and a full 88/88 live-correlator load on Debian 13.
 
-When the default `minisoc-fail2ban.local` file does not yet exist, the candidate checks standard alternative Fail2Ban jail configuration files for existing `nginx-skanery` or `nginx-dev-honeypot` sections. If found, it does **not** create the bundled defaults, avoiding accidental overrides of existing ban durations or retry thresholds.
+When the default `minisoc-fail2ban.local` file does not yet exist, the updater checks standard alternative Fail2Ban jail configuration files for existing `nginx-skanery` or `nginx-dev-honeypot` sections. If found, it does **not** create the bundled defaults, avoiding accidental overrides of existing ban durations or retry thresholds.
 
 **Do not run the old v1.3.4 installer against a production three-column MiniSOC database.** Review the newly proposed default jail configuration separately before any installation, since an existing custom jail may be configured in a different Fail2Ban file.
 

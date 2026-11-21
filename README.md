@@ -71,15 +71,15 @@ sudo bash ./install/install.sh --dry-run
 sudo bash ./install/install.sh
 ```
 
-The update preserves the project's existing jail file, supports conservative merges of known previous filter versions, and in the unreleased v1.3.5 candidate converts bundled public signature records to the three-column runtime format used by the real MiniSOC correlator. New runtime patterns are appended only when absent; old definitions remain unchanged. Backups are created before applying changes. The MiniSOC application itself is not restarted. **Review the proposed creation of a new default jail file carefully if you already configure those jails elsewhere.**
+The update preserves the project's existing jail file, supports conservative merges of known previous filter versions, and as of v1.3.5 converts bundled public signature records to the three-column runtime format used by the real MiniSOC correlator. New runtime patterns are appended only when absent; old definitions remain unchanged. Backups are created before applying changes. The MiniSOC application itself is not restarted. **Review the proposed creation of a new default jail file carefully if you already configure those jails elsewhere.**
 
-See [docs/FAIL2BAN.md](docs/FAIL2BAN.md), [unreleased v1.3.5 compatibility notes](docs/releases/v1.3.5.md), and [v1.3.4 release notes](docs/releases/v1.3.4.md).
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md), [v1.3.5 compatibility and release notes](docs/releases/v1.3.5.md), and [v1.3.4 release notes](docs/releases/v1.3.4.md).
 
-### Production MiniSOC signature format (unreleased v1.3.5 candidate)
+### Production MiniSOC signature format (v1.3.5)
 
 The actual `/opt/minisoc/bin/minisoc-correlator.py` reads each runtime database line as `category|severity|regex` using `raw.split('|', 2)`. Repeated categories are normal; literal `|` alternations inside the regex must survive unchanged. The public `rules/signatures-v2.db` format is `id|severity|category|regex` for source review and rule tracking; **this public representation must not be copied verbatim into the runtime database**.
 
-The candidate updater converts the public bundle to the runtime format, keeps existing lines unchanged, and skips exact regex patterns that already occur in the local database. Unlike v1.3.4, it does not treat repeated `secret`/`repository` categories as duplicate IDs. Preflight, backup, and rollback remain in place. It has not been deployed or validated against the complete private production database.
+The v1.3.5 updater converts the public bundle to the runtime format, keeps existing lines unchanged, and skips exact regex patterns that already occur in the local database. Unlike v1.3.4, it does not treat repeated `secret`/`repository` categories as duplicate IDs. Preflight, backup, and rollback remain in place. On Debian 13, a database-only update succeeded: the live correlator loaded 88 signatures in 19 categories with zero skipped entries, and a subsequent dry-run proposed no further changes. Customized filters were intentionally preserved and did not receive bundled filter changes.
 
 ### Previous v1.3.4 merge behavior (historical; incompatible with production format)
 
