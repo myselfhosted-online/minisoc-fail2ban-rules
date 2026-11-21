@@ -242,6 +242,37 @@ exit 0
         self.assertEqual((manifests[0].parent / db_record['backup_file']).read_bytes(), legacy)
         self.assertIn('Already up to date', self.execute())
 
+    def test_reported_debian_case_two_custom_filters_and_legacy_db_merge(self):
+        # End-to-end reproduction of the reported v1.3.3 dry-run sequence.
+        originals = {}
+        filter_dir = self.f2b / 'filter.d'
+        filter_dir.mkdir()
+        for name in module.FILTERS:
+            content = b'[Definition]\nfailregex = ^<HOST> .*private-production-filter\n'
+            path = filter_dir / name
+            path.write_bytes(content)
+            originals[path] = content
+        old_db = b'local-first-rule|HIGH|secret|^)legacy-regex\n'
+        self.db.write_bytes(old_db)
+
+        preview = self.execute(dry_run=True)
+        self.assertEqual(preview.count('WARNING PRESERVED'), 2)
+        self.assertIn('WARNING EXISTING REGEX', preview)
+        self.assertIn(f'WOULD UPDATE {self.db}', preview)
+        self.assertIn('REQUIRES REVIEW', preview)
+        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-filters'):
+            self.execute()
+        self.assertEqual(self.db.read_bytes(), old_db)
+        self.assertFalse(self.log.exists())
+
+        result = self.execute(preserve_custom_filters=True)
+        self.assertIn('PARTIAL UPDATE: customized filters were preserved', result)
+        self.assertNotIn('signature database was preserved', result)
+        self.assertTrue(self.db.read_bytes().startswith(old_db))
+        self.assertIn(b'dotenv-basic|HIGH|secret|', self.db.read_bytes())
+        for path, raw in originals.items():
+            self.assertEqual(path.read_bytes(), raw)
+
     def test_malformed_local_database_is_preserved_without_overwriting(self):
         legacy = b'operator-rule|HIGH|secret\n'
         self.db.write_bytes(legacy)
