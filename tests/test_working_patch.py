@@ -54,7 +54,7 @@ class Patches(unittest.TestCase):
     def test_fresh_install_and_second_run(self):
         update.run()
         self.assertTrue(self.db.exists())
-        self.assertIn('terraform-state-backup',self.db.read_text())
+        self.assertIn('infrastructure-state|HIGH|/terraform\\.tfstate\\.backup',self.db.read_text())
         self.assertEqual((self.etc/'filter.d'/'nginx-skanery.conf').read_bytes(),(ROOT/'fail2ban/filter.d/nginx-skanery.conf').read_bytes())
         old_calls=self.f2b.call_count
         update.run()
@@ -66,11 +66,11 @@ class Patches(unittest.TestCase):
         jail=self.etc/'jail.d'/'minisoc-fail2ban.local'
         jail.parent.mkdir(parents=True)
         jail.write_text('[nginx-skanery]\nmaxretry = 8\n')
-        self.db.write_text('custom-detection|MEDIUM|custom|/my-private-prefix\n')
+        self.db.write_text('custom|MEDIUM|/my-private-prefix\n')
         update.run()
         self.assertEqual(jail.read_text(),'[nginx-skanery]\nmaxretry = 8\n')
-        self.assertIn('custom-detection|MEDIUM',self.db.read_text())
-        self.assertIn('oauth-client-secrets-root|HIGH',self.db.read_text())
+        self.assertIn('custom|MEDIUM|/my-private-prefix',self.db.read_text())
+        self.assertIn('credential|HIGH|/client_secrets\\.json',self.db.read_text())
 
     def test_dry_run_has_no_effect(self):
         update.run(dry_run=True)
@@ -79,12 +79,12 @@ class Patches(unittest.TestCase):
         self.f2b.assert_not_called()
 
     def test_custom_signature_conflict_preserves_local_and_appends_missing(self):
-        self.db.write_text('git-head|INFO|custom|/other\n')
+        self.db.write_text('custom|LOW|/\\.git/HEAD(?:$|\\?)\n')
         update.run()
         merged = self.db.read_text()
-        self.assertTrue(merged.startswith('git-head|INFO|custom|/other\n'))
-        self.assertEqual(merged.count('git-head|'),1)
-        self.assertIn('dotenv-basic|HIGH|secret|',merged)
+        self.assertTrue(merged.startswith('custom|LOW|/\\.git/HEAD(?:$|\\?)\n'))
+        self.assertEqual(merged.count('/\\.git/HEAD(?:$|\\?)'),1)
+        self.assertIn('secret|HIGH|/(?:\\.env)',merged)
         self.assertTrue((self.etc/'filter.d').is_dir())
         self.assertTrue(self.f2b.called)
 
@@ -105,7 +105,7 @@ class Patches(unittest.TestCase):
     def test_automatic_rollback_on_validation_error(self):
         old=self.baseline('v1.3.0')
         old_content=old.read_bytes()
-        old_db=b'custom-detection|MEDIUM|custom|/my-private-prefix\n'
+        old_db=b'custom|MEDIUM|/my-private-prefix\n'
         self.db.write_bytes(old_db)
         calls=0
         def client(*args):

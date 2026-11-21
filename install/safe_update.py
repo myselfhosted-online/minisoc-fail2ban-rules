@@ -23,7 +23,8 @@ from dataclasses import dataclass
 ROOT = Path(__file__).resolve().parents[1]
 FILTERS = ('nginx-skanery.conf', 'nginx-dev-honeypot.conf')
 VERSIONS = ('v1.2.1', 'v1.3.0', 'v1.3.1', 'v1.3.2', 'v1.3.3')
-RELEASE = 'v1.3.4'
+RELEASE = 'v1.3.5'
+RUNTIME_SEVERITIES = {'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'}
 
 class UpdateError(Exception):
     pass
@@ -73,11 +74,12 @@ def parse_db(content: bytes, path: Path, *, validate_regex: bool=True) -> dict[s
         key, severity, category, pattern = parts
         if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', key):
             raise SignatureParseError(f'Invalid signature ID {path}:{idx}')
-        if severity not in {'HIGH', 'MEDIUM', 'INFO'} or not category or not pattern:
+        # The production MiniSOC correlator accepts these four levels, not INFO.
+        if severity not in RUNTIME_SEVERITIES or not category or not pattern:
             raise SignatureParseError(f'Invalid signature fields {path}:{idx}')
         if validate_regex:
             try:
-                re.compile(pattern)
+                re.compile(pattern, re.I)
             except re.error as exc:
                 raise SignatureParseError(f'Invalid regex {path}:{idx}: {exc}') from exc
         if key in entries:
@@ -86,37 +88,97 @@ def parse_db(content: bytes, path: Path, *, validate_regex: bool=True) -> dict[s
     return entries
 
 
-def merge_db(previous: bytes | None, incoming: bytes, destination: Path, source: Path) -> bytes:
-    new_entries = parse_db(incoming, source)
-    if previous is None:
-        return incoming
-    if not previous:
-        return incoming
-    # Already-running MiniSOC installations may contain legacy patterns from a
-    # different regex dialect. Keep them byte-for-byte; only shipped additions
-    # must compile with Python. Never silently drop a local signature.
-    old_entries = parse_db(previous, destination, validate_regex=False)
-    for idx, line in enumerate(previous.decode('utf-8').splitlines(), 1):
+def parse_runtime_db(content: bytes, path: Path, *, public_ids: set[str] | None = None,
+                     public_categories: set[str] | None = None) -> set[str]:
+    """Read the actual MiniSOC correlator format: kind|severity|regex.
+
+    A regex can contain arbitrary literal `|` alternations. Unlike the public
+    source DB, the installed format has no unique ID: repeating `secret` or
+    `repository` simply indicates multiple patterns of the same kind.
+    All existing bytes are preserved by merge_db, including comments and any
+    legacy regex the correlator itself would ignore as invalid.
+    """
+    try:
+        text = content.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise SignatureParseError(f'Invalid UTF-8 in {path}') from exc
+    if re.search(r'(?im)^\s*#\s*Format:\s*id\|severity\|category\|regex\s*$', text):
+        raise SignatureParseError(f'{path} contains public four-column signature format; '
+                                  'do not append legacy rows without reviewing the consumer')
+    patterns = set()
+    for idx, line in enumerate(text.splitlines(), 1):
         if not line.strip() or line.lstrip().startswith('#'):
             continue
-        pattern = line.split('|', 3)[3]
+        # An accidentally installed public DB may lack its format header.
+        # Distinguish known public IDs from repeatable runtime categories
+        # before the three-column split swallows the fourth field as regex.
+        public_parts = line.strip().split('|', 3)
+        if (len(public_parts) == 4 and public_ids and public_categories
+                and public_parts[0] in public_ids
+                and public_parts[2] in public_categories):
+            raise SignatureParseError(f'{path}:{idx} looks like public four-column signature '
+                                      'format; manual review required')
+        parts = line.strip().split('|', 2)
+        if len(parts) != 3:
+            raise SignatureParseError(f'Malformed MiniSOC runtime signature {path}:{idx}')
+        kind, severity, pattern = (part.strip() for part in parts)
+        if not kind or not pattern or severity.upper() not in RUNTIME_SEVERITIES:
+            raise SignatureParseError(f'Invalid MiniSOC runtime signature fields {path}:{idx}')
         try:
-            re.compile(pattern)
+            re.compile(pattern, re.I)
         except re.error as exc:
-            print(f'WARNING EXISTING REGEX {destination}:{idx}: not Python-compatible ({exc}); '
-                  'original signature retained unchanged')
-    collisions = sorted(k for k in old_entries.keys() & new_entries.keys() if old_entries[k] != new_entries[k])
-    if collisions:
-        print('WARNING SKIPPED EXISTING IDs: '+', '.join(collisions)+
-              '; local definitions take precedence; incoming definitions NOT installed')
-    additions = [line for key, line in new_entries.items() if key not in old_entries]
+            print(f'WARNING EXISTING REGEX {path}:{idx}: ignored by the production '
+                  f'MiniSOC correlator ({exc}); original signature retained unchanged')
+        patterns.add(pattern)
+    return patterns
+
+
+def bundled_runtime_rows(incoming: bytes, source: Path) -> list[tuple[str, str]]:
+    """Convert public id|severity|category|regex rows to runtime rows.
+
+    The ID is metadata of the public rules repository, NOT a runtime column.
+    """
+    new_entries = parse_db(incoming, source)
+    rows = []
+    for line in new_entries.values():
+        _key, severity, kind, pattern = line.split('|', 3)
+        # Avoid line injection or a malformed runtime record from upstream.
+        if '|' in kind or '\n' in kind or not kind.strip():
+            raise SignatureParseError(f'Invalid runtime category in {source}')
+        rows.append((pattern.strip(), f'{kind.strip()}|{severity}|{pattern.strip()}'))
+    return rows
+
+
+def merge_db(previous: bytes | None, incoming: bytes, destination: Path, source: Path) -> bytes:
+    rows = bundled_runtime_rows(incoming, source)
+    upstream = parse_db(incoming, source)
+    upstream_categories = {line.split('|', 3)[2] for line in upstream.values()}
+    original = previous or b''
+    # The real /opt/minisoc/bin/minisoc-correlator.py loader uses
+    # kind,sev,pat = raw.split('|', 2), then re.compile(pat, re.I).
+    # Do NOT write public four-column rows into that three-column database.
+    existing = parse_runtime_db(original, destination,
+                                public_ids=set(upstream), public_categories=upstream_categories)
+    additions = []
+    skipped = 0
+    for pattern, row in rows:
+        if pattern in existing:
+            skipped += 1
+            continue
+        additions.append(row)
+        existing.add(pattern)
+    if skipped and additions:
+        print(f'WARNING SKIPPED {skipped} existing signature pattern(s); '
+              'local category/severity/regex definitions take precedence')
     if not additions:
-        return previous
+        return original
     # Preserve the existing bytes and use its newline convention for additions.
-    newline = b'\r\n' if b'\r\n' in previous and previous.count(b'\n') == previous.count(b'\r\n') else b'\n'
-    separator = b'' if previous.endswith(b'\n') else newline
-    suffix = (f'\n# Added by MiniSOC {RELEASE}\n' + '\n'.join(additions) + '\n').encode('utf-8')
-    return previous + separator + suffix.replace(b'\n', newline)
+    newline = b'\r\n' if b'\r\n' in original and original.count(b'\n') == original.count(b'\r\n') else b'\n'
+    separator = b'' if not original or original.endswith(b'\n') else newline
+    prefix = '\n' if original else ''
+    suffix = (f'{prefix}# Added by MiniSOC {RELEASE} (runtime kind|severity|regex)\n'
+              + '\n'.join(additions) + '\n').encode('utf-8')
+    return original + separator + suffix.replace(b'\n', newline)
 
 
 def filter_merge(current: bytes | None, incoming: bytes, filename: str) -> tuple[bytes, str]:
@@ -198,6 +260,33 @@ def f2b(*args: str) -> None:
         raise UpdateError(f'Fail2Ban {" ".join(args)} failed: {exc}') from exc
 
 
+def preexisting_jails(f2b_etc: Path, managed_file: Path) -> list[Path]:
+    """Avoid introducing a second jail definition over a local one.
+
+    Fail2Ban can merge sections from multiple jail files. Creating the bundled
+    maxretry=1 defaults in that situation could silently change live policy.
+    """
+    candidates = [f2b_etc/'jail.conf', f2b_etc/'jail.local']
+    for ext in ('*.conf', '*.local'):
+        candidates.extend((f2b_etc/'jail.d').glob(ext))
+    matches=[]
+    target = re.compile(rb'(?m)^\s*\[\s*(?:nginx-skanery|nginx-dev-honeypot)\s*\]')
+    for file in sorted(set(candidates)):
+        if file == managed_file or not (file.exists() or file.is_symlink()):
+            continue
+        if file.is_symlink() or not file.is_file():
+            matches.append(file)  # An unknown jail source must not be overwritten.
+            continue
+        try:
+            content=file.read_bytes()
+        except OSError:
+            matches.append(file)
+            continue
+        if target.search(content):
+            matches.append(file)
+    return matches
+
+
 def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: bool) -> tuple[list[Change], list[Path], list[Path]]:
     changes=[]
     preserved=[]
@@ -221,12 +310,18 @@ def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: boo
     no_symlink_parents(jail)
     old_jail=regular_file(jail)
     if old_jail is None:
-        content=(ROOT/'fail2ban'/'jail.d'/'minisoc-fail2ban.local.example').read_bytes()
-        if nginx_log is not None:
-            if not nginx_log.startswith('/') or '\r' in nginx_log or '\n' in nginx_log:
-                raise UpdateError('NGINX_LOG must be an absolute path without newlines')
-            content=re.sub(rb'(?m)^logpath = .*$',lambda _:b'logpath = '+nginx_log.encode(),content)
-        changes.append(Change(jail,None,content,'new default jail','jail.d/minisoc-fail2ban.local'))
+        other_jails=preexisting_jails(f2b_etc,jail)
+        if other_jails:
+            print('WARNING SKIPPED new default jail: existing custom jail source(s) found: '
+                  + ', '.join(str(p) for p in other_jails) +
+                  '; preserving existing effective jail settings')
+        else:
+            content=(ROOT/'fail2ban'/'jail.d'/'minisoc-fail2ban.local.example').read_bytes()
+            if nginx_log is not None:
+                if not nginx_log.startswith('/') or '\r' in nginx_log or '\n' in nginx_log:
+                    raise UpdateError('NGINX_LOG must be an absolute path without newlines')
+                content=re.sub(rb'(?m)^logpath = .*$',lambda _:b'logpath = '+nginx_log.encode(),content)
+            changes.append(Change(jail,None,content,'new default jail','jail.d/minisoc-fail2ban.local'))
     else:
         print(f'PRESERVED {jail} (jail settings unchanged)')
         if nginx_log:
@@ -250,7 +345,7 @@ def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: boo
                   f'bundled {RELEASE} signatures NOT activated')
         else:
             if content != old_db:
-                changes.append(Change(db,old_db,content,'add new signature IDs; preserve local rules','minisoc/signatures-v2.db'))
+                changes.append(Change(db,old_db,content,'append missing runtime signature patterns; preserve local rules','minisoc/signatures-v2.db'))
     elif require_minisoc:
         raise UpdateError(f'MiniSOC signature directory missing: {db.parent}')
     else:

@@ -5,6 +5,7 @@ import importlib.util
 import io
 import os
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -60,10 +61,33 @@ exit 0
         installed.write_bytes(content)
         return installed
 
+    @staticmethod
+    def load_like_correlator(content):
+        """Mirror the actual production MiniSOC `load_signatures` loop."""
+        rows=[]
+        for raw in content.decode('utf-8').splitlines():
+            raw=raw.strip()
+            if not raw or raw.startswith('#'):
+                continue
+            try:
+                kind, sev, pat=raw.split('|', 2)
+                sev=sev.strip().upper()
+                rx=re.compile(pat.strip(), re.I)
+            except Exception:
+                continue
+            if sev not in {'LOW','MEDIUM','HIGH','CRITICAL'}:
+                continue
+            rows.append((kind.strip(), sev, rx.pattern))
+        return rows
+
     def test_fresh_install_and_idempotency(self):
         result = self.execute()
         self.assertIn("SUCCESS", result)
-        self.assertEqual(self.db.read_bytes(), (ROOT / "rules/signatures-v2.db").read_bytes())
+        runtime = self.db.read_bytes()
+        self.assertIn(b'wordpress-webshell|HIGH|/wp-content/plugins/hellopress/', runtime)
+        self.assertNotIn(b'dotenv-basic|HIGH|secret|', runtime)
+        self.assertEqual(len(self.load_like_correlator(runtime)), len(module.parse_db(
+            (ROOT / 'rules/signatures-v2.db').read_bytes(), ROOT / 'rules/signatures-v2.db')))
         self.assertTrue((self.f2b / "jail.d" / "minisoc-fail2ban.local").is_file())
         self.assertIn("Already up to date", self.execute())
         self.assertEqual(self.log.read_text().splitlines().count("reload"), 1)
@@ -74,14 +98,14 @@ exit 0
         jail = self.f2b / "jail.d" / "minisoc-fail2ban.local"
         jail.parent.mkdir(exist_ok=True)
         jail.write_text("[nginx-skanery]\nmaxretry = 3\nbantime = 9000\n")
-        existing = "# Local operator changes\noperator-custom|MEDIUM|operator|/operator-check(?:$|\\?)\n"
+        existing = "# Local operator changes\noperator|MEDIUM|/operator-check(?:$|\\?)\n"
         self.db.write_text(existing)
         self.execute()
         self.assertEqual(current.read_bytes(), (ROOT / "fail2ban/filter.d/nginx-skanery.conf").read_bytes())
         self.assertEqual(other.read_bytes(), (ROOT / "fail2ban/filter.d/nginx-dev-honeypot.conf").read_bytes())
         self.assertEqual(jail.read_text(), "[nginx-skanery]\nmaxretry = 3\nbantime = 9000\n")
         self.assertIn(existing, self.db.read_text())
-        self.assertIn("git-head|HIGH|repository", self.db.read_text())
+        self.assertIn("repository|HIGH|/\\.git/HEAD", self.db.read_text())
 
     def test_custom_filter_comments_are_preserved(self):
         filter_path = self.create_installed_filter(suffix=b"\n# Custom security note\n")
@@ -119,7 +143,7 @@ exit 0
         dry_run = self.execute(dry_run=True)
         self.assertIn('WARNING PRESERVED', dry_run)
         self.assertIn('REQUIRES REVIEW', dry_run)
-        self.assertIn('bundled v1.3.4 filter rules NOT activated', dry_run)
+        self.assertIn('bundled v1.3.5 filter rules NOT activated', dry_run)
         with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-filters'):
             self.execute()
         self.assertEqual(installed.read_bytes(), custom)
@@ -159,47 +183,151 @@ exit 0
         self.assertEqual(filter_path.read_bytes(), content)
         self.assertFalse((self.f2b / "jail.d").exists())
 
-    def test_conflicting_signature_id_keeps_local_and_adds_new_ids(self):
-        current = "git-head|MEDIUM|repository|/custom-path\n"
+    def test_existing_pattern_keeps_local_metadata_and_adds_other_patterns(self):
+        current = "operator|MEDIUM|/\\.git/HEAD(?:$|\\?)\n"
         self.db.write_text(current)
         plan = self.execute(dry_run=True)
-        self.assertIn('WARNING SKIPPED EXISTING IDs: git-head', plan)
+        self.assertIn('WARNING SKIPPED 1 existing signature pattern', plan)
         self.assertEqual(self.db.read_text(), current)
         output = self.execute()
-        self.assertIn('WARNING SKIPPED EXISTING IDs: git-head', output)
+        self.assertIn('WARNING SKIPPED 1 existing signature pattern', output)
         merged = self.db.read_text()
         self.assertTrue(merged.startswith(current))
-        self.assertEqual(merged.count('git-head|'), 1)
-        self.assertIn('dotenv-basic|HIGH|secret|', merged)
+        self.assertEqual(merged.count('/\\.git/HEAD(?:$|\\?)'), 1)
+        self.assertIn('secret|HIGH|/(?:\\.env)', merged)
         self.assertIn('reload', self.log.read_text())
         self.assertIn('Already up to date', self.execute())
 
     def test_existing_database_crlf_bytes_and_regex_pipes_survive_merge(self):
         existing = (b'# operator notes\r\n'
-                    b'custom-pipe|MEDIUM|operator|/(?:first|second)(?:$|\\?)\r\n'
-                    b'git-head|INFO|custom|/git-is-private\r\n')
+                    b'operator|MEDIUM|/(?:first|second)(?:$|\\?)\r\n'
+                    b'custom|LOW|/git-is-private\r\n')
         source = ROOT / 'rules/signatures-v2.db'
         merged = module.merge_db(existing, source.read_bytes(), self.db, source)
         self.assertTrue(merged.startswith(existing))
-        self.assertEqual(merged.count(b'git-head|'), 1)
-        self.assertEqual(merged.count(b'custom-pipe|'), 1)
-        self.assertIn(b'\r\n# Added by MiniSOC v1.3.4\r\n', merged)
+        self.assertEqual(merged.count(b'/git-is-private'), 1)
+        self.assertEqual(merged.count(b'/(?:first|second)'), 1)
+        self.assertIn(b'\r\n# Added by MiniSOC v1.3.5 (runtime kind|severity|regex)\r\n', merged)
         self.assertEqual(merged.count(b'\n'), merged.count(b'\r\n'))
         self.assertEqual(module.merge_db(merged, source.read_bytes(), self.db, source), merged)
 
+    def test_reported_debian_runtime_categories_are_not_unique_ids(self):
+        # Exact *structure* from the operator's November 21 `awk -F'|' output.
+        # Regex alternations introduce extra `|` characters, but the actual
+        # correlator uses split('|', 2), and categories intentionally repeat.
+        old_db = (b'secret|HIGH|/\\.env([./? ]|$)\n'
+                  b'secret|HIGH|/\\.env\\.(bak|old|save|prod)([/? ]|$)\n'
+                  b'repository|HIGH|/\\.git/(config|HEAD)([/? ]|$)\n'
+                  b'credential|HIGH|/\\.aws/(credentials|config)([/? ]|$)\n')
+        self.db.write_bytes(old_db)
+        original_count=len(self.load_like_correlator(old_db))
+        self.assertEqual(original_count, 4)
+        dry = self.execute(dry_run=True, preserve_custom_filters=True)
+        self.assertIn(f'WOULD UPDATE {self.db}', dry)
+        self.assertNotIn(f'WARNING PRESERVED {self.db}', dry)
+        self.assertNotIn('--preserve-custom-signatures', dry)
+        self.assertEqual(self.db.read_bytes(), old_db)
+        self.assertFalse(self.log.exists())
+        result = self.execute(preserve_custom_filters=True)
+        self.assertIn('SUCCESS', result)
+        merged = self.db.read_bytes()
+        self.assertTrue(merged.startswith(old_db))
+        self.assertGreater(len(self.load_like_correlator(merged)), original_count)
+        self.assertNotIn(b'dotenv-basic|HIGH|secret|', merged)
+        self.assertEqual(self.load_like_correlator(merged)[:original_count],
+                         self.load_like_correlator(old_db))
+        for kind, sev, pattern in self.load_like_correlator(merged):
+            self.assertTrue(kind and sev and pattern)
+        backup = next(self.f2b.glob('minisoc-backup-*/manifest.json'))
+        records = __import__('json').loads(backup.read_text())['changes']
+        db_record = next(row for row in records if row['path']==str(self.db))
+        self.assertEqual((backup.parent/db_record['backup_file']).read_bytes(), old_db)
+        self.assertIn('Already up to date', self.execute())
+
+    def test_existing_jail_in_separate_file_is_not_shadowed_by_new_defaults(self):
+        # Reported Debian preview tried to add a new default jail file even
+        # though an operator may already enable these jails elsewhere.
+        path=self.f2b/'jail.d'/'custom-homelab.local'
+        path.parent.mkdir()
+        original=b'[nginx-skanery]\nenabled = true\nmaxretry = 6\nbantime = 7d\n'
+        path.write_bytes(original)
+        dry=self.execute(dry_run=True)
+        self.assertIn('WARNING SKIPPED new default jail', dry)
+        self.assertNotIn('new default jail\n', dry)
+        self.execute()
+        self.assertFalse((self.f2b/'jail.d'/'minisoc-fail2ban.local').exists())
+        self.assertEqual(path.read_bytes(), original)
+        self.assertTrue(self.db.exists())
+
+    def test_preexisting_jail_in_top_level_local_is_preserved(self):
+        path=self.f2b/'jail.local'
+        original=b'[nginx-dev-honeypot]\nenabled = true\nmaxretry = 4\n'
+        path.write_bytes(original)
+        self.execute()
+        self.assertEqual(path.read_bytes(),original)
+        self.assertFalse((self.f2b/'jail.d/minisoc-fail2ban.local').exists())
+
+    def test_repeated_categories_and_regex_alternation_remain_distinct(self):
+        old = (b'secret|HIGH|/\\.env([./? ]|$)\n'
+               b'secret|HIGH|/\\.env\\.(bak|old)([/? ]|$)\n'
+               b'secret|MEDIUM|/\\.env-example(?:$|\\?)\n')
+        patterns=module.parse_runtime_db(old,self.db)
+        self.assertEqual(len(patterns), 3)
+        self.assertIn('/\\.env([./? ]|$)', patterns)
+
+    def test_existing_canonical_four_column_file_requires_review(self):
+        old=(b'# Format: id|severity|category|regex\n'
+             b'dotenv-basic|HIGH|secret|/(?:\\.env)(?:$|[./_-])\n')
+        self.db.write_bytes(old)
+        preview=self.execute(dry_run=True)
+        self.assertIn('WARNING PRESERVED', preview)
+        self.assertIn('public four-column signature format', preview)
+        with self.assertRaisesRegex(module.UpdateError,'--preserve-custom-signatures'):
+            self.execute()
+        self.assertEqual(self.db.read_bytes(), old)
+
+    def test_headerless_public_four_column_file_requires_review(self):
+        # A missing header must not trick a 3-column reader into treating
+        # public `category|regex` as a compilable legacy regex.
+        old=b'dotenv-basic|HIGH|secret|/(?:\\.env)(?:$|[./_-])\n'
+        self.db.write_bytes(old)
+        preview=self.execute(dry_run=True)
+        self.assertIn('WARNING PRESERVED', preview)
+        self.assertIn('public four-column signature format', preview)
+        with self.assertRaisesRegex(module.UpdateError,'--preserve-custom-signatures'):
+            self.execute()
+        self.assertEqual(self.db.read_bytes(), old)
+
+    def test_unsupported_upstream_severity_is_never_installed(self):
+        incoming=b'unsafe-info|INFO|secret|/bad\n'
+        with self.assertRaisesRegex(module.SignatureParseError,'Invalid signature fields'):
+            module.merge_db(b'secret|HIGH|/legacy\n',incoming,self.db,Path('bundled'))
+
+    def test_duplicate_categories_survive_automatic_rollback(self):
+        old_db=(b'secret|HIGH|/\\.env([./? ]|$)\n'
+                b'secret|HIGH|/\\.env\\.(bak|old)([/? ]|$)\n')
+        self.db.write_bytes(old_db)
+        os.environ['FAKE_FAIL_ON_TEST']='2'
+        self.addCleanup(os.environ.pop,'FAKE_FAIL_ON_TEST',None)
+        with self.assertRaisesRegex(module.UpdateError,'restored automatically'):
+            self.execute()
+        self.assertEqual(self.db.read_bytes(), old_db)
+        self.assertFalse((self.f2b/'jail.d/minisoc-fail2ban.local').exists())
+
     def test_existing_database_without_final_newline_preserved(self):
-        existing = b'operator-rule|INFO|operator|/already-exists'
+        existing = b'operator|LOW|/already-exists'
         source = ROOT / 'rules/signatures-v2.db'
         merged = module.merge_db(existing, source.read_bytes(), self.db, source)
-        self.assertTrue(merged.startswith(existing + b'\n\n# Added by MiniSOC v1.3.4\n'))
-        self.assertEqual(merged.count(b'operator-rule|'), 1)
+        self.assertTrue(merged.startswith(existing + b'\n\n# Added by MiniSOC v1.3.5 (runtime kind|severity|regex)\n'))
+        self.assertEqual(merged.count(b'/already-exists'), 1)
         self.assertEqual(module.merge_db(merged, source.read_bytes(), self.db, source), merged)
 
     def test_empty_installed_database_uses_exact_bundled_content(self):
         self.db.write_bytes(b'')
         output = self.execute()
         self.assertIn('SUCCESS', output)
-        self.assertEqual(self.db.read_bytes(), (ROOT / 'rules/signatures-v2.db').read_bytes())
+        self.assertIn(b'# Added by MiniSOC v1.3.5', self.db.read_bytes())
+        self.assertEqual(len(self.load_like_correlator(self.db.read_bytes())), 40)
 
     def test_non_utf8_existing_database_is_preserved_without_loss(self):
         raw = b'\xff\xfelocal-data\n'
@@ -214,13 +342,13 @@ exit 0
 
     def test_duplicate_ids_in_bundled_signatures_rejected(self):
         malformed = (b'duplicate|HIGH|secret|/first\n'
-                     b'duplicate|INFO|operator|/second\n')
+                     b'duplicate|LOW|operator|/second\n')
         with self.assertRaisesRegex(module.SignatureParseError, 'Duplicate signature ID duplicate'):
             module.merge_db(b'local|INFO|operator|/ok\n', malformed, self.db, Path('bundled-db'))
 
     def test_invalid_python_legacy_regex_is_retained_in_merged_database(self):
         # Reproduces production line-1 failure without changing its regex.
-        legacy = b'operator-rule|HIGH|secret|^)bad-regex\n'
+        legacy = b'secret|HIGH|^)bad-regex\n'
         self.db.write_bytes(legacy)
         output = self.execute(dry_run=True)
         self.assertIn('WARNING EXISTING REGEX', output)
@@ -232,8 +360,8 @@ exit 0
         output = self.execute()
         merged = self.db.read_bytes()
         self.assertTrue(merged.startswith(legacy))
-        self.assertIn(b'git-head|HIGH|repository|', merged)
-        self.assertEqual(merged.count(b'operator-rule|'), 1)
+        self.assertIn(b'repository|HIGH|/\\.git/HEAD', merged)
+        self.assertEqual(merged.count(b'bad-regex'), 1)
         self.assertIn('reload', self.log.read_text())
         manifests = list(self.f2b.glob('minisoc-backup-*/manifest.json'))
         self.assertEqual(len(manifests), 1)
@@ -252,7 +380,7 @@ exit 0
             path = filter_dir / name
             path.write_bytes(content)
             originals[path] = content
-        old_db = b'local-first-rule|HIGH|secret|^)legacy-regex\n'
+        old_db = b'secret|HIGH|^)legacy-regex\n'
         self.db.write_bytes(old_db)
 
         preview = self.execute(dry_run=True)
@@ -269,12 +397,12 @@ exit 0
         self.assertIn('PARTIAL UPDATE: customized filters were preserved', result)
         self.assertNotIn('signature database was preserved', result)
         self.assertTrue(self.db.read_bytes().startswith(old_db))
-        self.assertIn(b'dotenv-basic|HIGH|secret|', self.db.read_bytes())
+        self.assertIn(b'secret|HIGH|/(?:\\.env)', self.db.read_bytes())
         for path, raw in originals.items():
             self.assertEqual(path.read_bytes(), raw)
 
     def test_malformed_local_database_is_preserved_without_overwriting(self):
-        legacy = b'operator-rule|HIGH|secret\n'
+        legacy = b'operator-rule|HIGH\n'
         self.db.write_bytes(legacy)
         plan = self.execute(dry_run=True)
         self.assertIn(f'WARNING PRESERVED {self.db}', plan)
@@ -292,7 +420,7 @@ exit 0
         path = self.f2b / 'filter.d/nginx-skanery.conf'
         path.parent.mkdir()
         path.write_bytes(custom)
-        legacy = b'local-secret|HIGH|secret\n'
+        legacy = b'local-secret|HIGH\n'
         self.db.write_bytes(legacy)
         plan = self.execute(dry_run=True)
         self.assertEqual(plan.count('WARNING PRESERVED'), 2)
@@ -309,7 +437,7 @@ exit 0
         self.assertEqual(path.read_bytes(), custom)
 
     def test_merged_legacy_db_survives_rollback(self):
-        legacy = b'operator-rule|HIGH|secret|^)invalid-regex\n'
+        legacy = b'secret|HIGH|^)invalid-regex\n'
         self.db.write_bytes(legacy)
         os.environ['FAKE_FAIL_ON_TEST'] = '2'
         self.addCleanup(os.environ.pop, 'FAKE_FAIL_ON_TEST', None)
@@ -336,7 +464,7 @@ exit 0
     def test_failed_validation_restores_both_filters_and_db(self):
         old = self.create_installed_filter("v1.2.1")
         old_content = old.read_bytes()
-        old_db = "# local database\noperator-custom|MEDIUM|operator|/operator-check\n"
+        old_db = "# local database\noperator|MEDIUM|/operator-check\n"
         self.db.write_text(old_db)
         os.environ["FAKE_FAIL_ON_TEST"] = "2"
         self.addCleanup(os.environ.pop, "FAKE_FAIL_ON_TEST", None)

@@ -71,15 +71,21 @@ sudo bash ./install/install.sh --dry-run
 sudo bash ./install/install.sh
 ```
 
-The update preserves existing jail settings, supports conservative merges of known previous filter versions, and merges MiniSOC signatures by ID. Conflicts stop the upgrade without overwriting custom rules. Backups are created before applying changes. The MiniSOC application itself is not restarted.
+The update preserves the project's existing jail file, supports conservative merges of known previous filter versions, and in the unreleased v1.3.5 candidate converts bundled public signature records to the three-column runtime format used by the real MiniSOC correlator. New runtime patterns are appended only when absent; old definitions remain unchanged. Backups are created before applying changes. The MiniSOC application itself is not restarted. **Review the proposed creation of a new default jail file carefully if you already configure those jails elsewhere.**
 
-See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.4 release notes](docs/releases/v1.3.4.md).
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md), [unreleased v1.3.5 compatibility notes](docs/releases/v1.3.5.md), and [v1.3.4 release notes](docs/releases/v1.3.4.md).
 
-### Merge old and new MiniSOC signatures by ID (v1.3.4)
+### Production MiniSOC signature format (unreleased v1.3.5 candidate)
 
-The v1.3.3 updater could abort even in `--dry-run` while compiling an existing, operator-maintained `/etc/minisoc/signatures-v2.db` regex using Python. A failed validation does **not** prove the live MiniSOC service is broken. The updated installer accepts the existing database's legacy regex syntax as-is, validates all bundled additions, and builds **one merged database at the same path**.
+The actual `/opt/minisoc/bin/minisoc-correlator.py` reads each runtime database line as `category|severity|regex` using `raw.split('|', 2)`. Repeated categories are normal; literal `|` alternations inside the regex must survive unchanged. The public `rules/signatures-v2.db` format is `id|severity|category|regex` for source review and rule tracking; **this public representation must not be copied verbatim into the runtime database**.
 
-Merge policy:
+The candidate updater converts the public bundle to the runtime format, keeps existing lines unchanged, and skips exact regex patterns that already occur in the local database. Unlike v1.3.4, it does not treat repeated `secret`/`repository` categories as duplicate IDs. Preflight, backup, and rollback remain in place. It has not been deployed or validated against the complete private production database.
+
+### Previous v1.3.4 merge behavior (historical; incompatible with production format)
+
+The v1.3.3 updater could abort even in `--dry-run` while compiling an existing, operator-maintained `/etc/minisoc/signatures-v2.db` regex using Python. Version 1.3.4 addressed the old-regex failure but still assumed the public four-column format was the production format. **Do not install v1.3.4 against an existing three-column MiniSOC runtime database.**
+
+The old v1.3.4 policy was based on IDs and is superseded by the v1.3.5 runtime-compatible design:
 
 - Existing ID unchanged, including any old regex: **keep the original**.
 - New ID absent locally: **append the new bundled entry**.
