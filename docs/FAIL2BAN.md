@@ -225,7 +225,7 @@ If MiniSOC is not installed, its signature update is skipped. Set `MINISOC_SIGNA
 
 A safe update cannot automatically resolve all user-modified regexes. On conflict, **do not force an overwrite**: review the local rule and reconcile it with the new upstream filter.
 
-### Inspect or restore a saved backup (upcoming update)
+### Inspect or restore a saved backup (v1.3.2)
 
 The backup manifest records the original file hashes, ownership and modes. Inspect the selected backup before attempting restoration:
 
@@ -242,7 +242,7 @@ sudo bash ./install/uninstall.sh --dry-run
 sudo bash ./install/uninstall.sh
 ```
 
-The upcoming fail-closed uninstaller removes only files identical to recognized project baselines or the currently bundled versions. Customized filters, local overrides and modified jail files cause the entire operation to stop for manual review. Before deleting project-owned files it creates a backup, and after removal it validates/reloads Fail2Ban; failure triggers automatic restoration. It intentionally preserves the MiniSOC signature database.
+The v1.3.2 fail-closed uninstaller removes only files identical to recognized project baselines or the currently bundled versions. Customized filters, local overrides and modified jail files cause the entire operation to stop for manual review. Before deleting project-owned files it creates a backup, and after removal it validates/reloads Fail2Ban; failure triggers automatic restoration. It intentionally preserves the MiniSOC signature database.
 
 ## Before using in production
 

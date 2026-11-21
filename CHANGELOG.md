@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — v1.3.2 candidate
+## 1.3.2 — 2026-11-21
 
 - Add narrowly scoped rules for encoded environment-file traversal, root SQL backup discovery, sensitive service-account and Streamlit paths; preserve broad discovery patterns as review-only candidates.
 - Harden the update path with a v1.3.1 baseline, conflict checks, backups, and automated rollback on validation or reload failure.
