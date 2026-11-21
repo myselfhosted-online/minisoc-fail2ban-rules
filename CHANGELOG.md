@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.4 — 2026-11-21 (candidate; not released)
+## 1.3.4 — 2026-11-21
 
 - Fix a v1.3.3 dry-run failure when a locally installed MiniSOC signature database contains a regex that the updater's Python validator cannot compile (e.g. `Invalid regex /etc/minisoc/signatures-v2.db:1`).
 - Merge existing and bundled signature databases into the same `/etc/minisoc/signatures-v2.db`: preserve all existing lines verbatim and append only IDs not already present. Existing regexes are not rejected solely because Python cannot compile their legacy syntax; warn for operator review.

@@ -73,9 +73,9 @@ sudo bash ./install/install.sh
 
 The update preserves existing jail settings, supports conservative merges of known previous filter versions, and merges MiniSOC signatures by ID. Conflicts stop the upgrade without overwriting custom rules. Backups are created before applying changes. The MiniSOC application itself is not restarted.
 
-See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.4 candidate notes](docs/releases/v1.3.4.md).
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.4 release notes](docs/releases/v1.3.4.md).
 
-### Merge old and new MiniSOC signatures by ID (v1.3.4 candidate)
+### Merge old and new MiniSOC signatures by ID (v1.3.4)
 
 The v1.3.3 updater could abort even in `--dry-run` while compiling an existing, operator-maintained `/etc/minisoc/signatures-v2.db` regex using Python. A failed validation does **not** prove the live MiniSOC service is broken. The updated installer accepts the existing database's legacy regex syntax as-is, validates all bundled additions, and builds **one merged database at the same path**.
 
