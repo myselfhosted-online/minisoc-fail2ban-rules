@@ -2,6 +2,8 @@
 
 ## 1.3.5 — unreleased compatibility fix (candidate)
 
+- Avoid an unnecessary Fail2Ban reload when only the external MiniSOC runtime signature database changes; leave all active jail configurations untouched.
+
 - Correct the database-format mismatch found on the operator's actual Debian MiniSOC: production `minisoc-correlator.py` reads `category|severity|regex` with `split('|', 2)`, while public source rules use `id|severity|category|regex`.
 - Translate bundled source entries to the real runtime format before writing `/etc/minisoc/signatures-v2.db`. Repeated categories such as `secret` and `repository` are valid, and regex alternation pipes are not field delimiters.
 - Keep all existing local lines byte-for-byte; skip appending bundled patterns already present, regardless of the local category or severity. Validate bundled regexes using the correlator's Python `re.I` mode and supported severity values.

@@ -245,6 +245,8 @@ exit 0
         self.assertIn('Already up to date', self.execute())
 
     def test_existing_jail_in_separate_file_is_not_shadowed_by_new_defaults(self):
+        # The existing jail test protects policy; database-only updates must
+        # also avoid an unnecessary Fail2Ban reload (see the next test).
         # Reported Debian preview tried to add a new default jail file even
         # though an operator may already enable these jails elsewhere.
         path=self.f2b/'jail.d'/'custom-homelab.local'
@@ -258,6 +260,30 @@ exit 0
         self.assertFalse((self.f2b/'jail.d'/'minisoc-fail2ban.local').exists())
         self.assertEqual(path.read_bytes(), original)
         self.assertTrue(self.db.exists())
+
+    def test_database_only_upgrade_never_reloads_existing_fail2ban_jails(self):
+        # Reproduce the operator's v1.3.5 dry-run: two unknown customized
+        # filters, separate jail definitions and a valid legacy 3-column DB.
+        self.db.write_bytes(b'secret|HIGH|/\\.env([./? ]|$)\n')
+        filter_dir = self.f2b/'filter.d'
+        filter_dir.mkdir()
+        for filename in module.FILTERS:
+            (filter_dir/filename).write_bytes(b'[Definition]\nfailregex = ^<HOST> .*operator-custom\n')
+        jail = self.f2b/'jail.d'/'nginx-skanery.local'
+        jail.parent.mkdir()
+        original_jail = b'[nginx-skanery]\nenabled = true\nmaxretry = 7\n'
+        jail.write_bytes(original_jail)
+        preview = self.execute(dry_run=True,preserve_custom_filters=True)
+        self.assertIn(f'WOULD UPDATE {self.db}',preview)
+        self.assertIn('WARNING SKIPPED new default jail',preview)
+        result = self.execute(preserve_custom_filters=True)
+        self.assertIn('no Fail2Ban reload performed',result)
+        self.assertFalse(self.log.exists())
+        self.assertEqual(jail.read_bytes(),original_jail)
+        self.assertTrue(self.db.read_bytes().startswith(b'secret|HIGH|/\\.env([./? ]|$)\n'))
+        backup = next(self.f2b.glob('minisoc-backup-*/manifest.json'))
+        records = __import__('json').loads(backup.read_text())['changes']
+        self.assertEqual([row['path'] for row in records],[str(self.db)])
 
     def test_preexisting_jail_in_top_level_local_is_preserved(self):
         path=self.f2b/'jail.local'

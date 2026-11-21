@@ -219,7 +219,7 @@ The updater:
 3. merges filters conservatively against bundled v1.2.1/v1.3.0/v1.3.1/v1.3.2/v1.3.3 baselines; conflicting local changes require manual review;
 4. in the unreleased v1.3.5 candidate, converts public rule IDs to the MiniSOC runtime's three-column `category|severity|regex` format, keeps local entries unchanged, and skips already-present regex patterns;
 5. creates root-protected backups under `/etc/fail2ban/minisoc-backup-*`;
-6. validates and reloads Fail2Ban, restoring files and attempting to reload the previous configuration if an update fails.
+6. validates and reloads Fail2Ban only when its filter or jail configuration changes; database-only MiniSOC updates deliberately skip Fail2Ban reload. On failure, changed files are restored, and Fail2Ban is reloaded again only if its configuration was changed.
 
 If MiniSOC is not installed, its signature update is skipped. Set `MINISOC_SIGNATURES=/absolute/path` to specify a different database or `MINISOC_REQUIRED=1` to require it. The installer does **not** restart MiniSOC; if its classification engine caches the database, it needs a separate reload.
 

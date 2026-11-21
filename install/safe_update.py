@@ -424,15 +424,20 @@ def run(dry_run: bool=False, preserve_custom_filters: bool=False,
         raise UpdateError('Incompatible local MiniSOC signature database requires manual review; no files changed. '
                           'To update other managed files while leaving the database untouched, '
                           'rerun with --preserve-custom-signatures.')
-    if not shutil.which('fail2ban-client'):
-        raise UpdateError('fail2ban-client not found')
     if not changes:
         if preserved or preserved_databases:
             print('PARTIAL: no managed changes; incompatible filters/databases remain unchanged and unupgraded')
         else:
             print('Already up to date; no changes necessary')
         return
-    f2b('-t')
+    # MiniSOC's runtime database is consumed by its correlator, not by
+    # Fail2Ban. Never reload live jails for a database-only update.
+    reload_fail2ban = any(item.logical_name.startswith(('filter.d/', 'jail.d/'))
+                          for item in changes)
+    if reload_fail2ban:
+        if not shutil.which('fail2ban-client'):
+            raise UpdateError('fail2ban-client not found')
+        f2b('-t')
     base.mkdir(parents=True,exist_ok=True)
     lock=base/'.minisoc-update.lock'
     no_symlink_parents(lock)
@@ -453,19 +458,23 @@ def run(dry_run: bool=False, preserve_custom_filters: bool=False,
                 # Register *before* write so any partial error after replacement is rolled back.
                 changed.append(item)
                 atomic_write(item.destination,item.after,item.before)
-            f2b('-t')
-            f2b('reload')
-        except BaseException as exc:
-            errors=restore(changed)
-            try:
+            if reload_fail2ban:
                 f2b('-t')
                 f2b('reload')
-            except Exception as reload_exc:
-                errors.append(f'Reload of restored configuration failed: {reload_exc}')
+        except BaseException as exc:
+            errors=restore(changed)
+            if reload_fail2ban:
+                try:
+                    f2b('-t')
+                    f2b('reload')
+                except Exception as reload_exc:
+                    errors.append(f'Reload of restored configuration failed: {reload_exc}')
             if errors:
                 raise UpdateError('UPDATE FAILED; rollback INCOMPLETE: '+'; '.join(errors)+f'. Backup: {backup}') from exc
             raise UpdateError(f'UPDATE FAILED; previous files restored automatically. Backup: {backup}; cause: {exc}') from exc
         print(f'SUCCESS; backup available at {backup}')
+        if not reload_fail2ban:
+            print('NOTICE: Fail2Ban configuration unchanged; no Fail2Ban reload performed')
         if preserved:
             print('PARTIAL UPDATE: customized filters were preserved; bundled filter rules NOT activated for them')
         if preserved_databases:

@@ -99,7 +99,7 @@ sudo bash ./install/install.sh --dry-run --preserve-custom-filters
 sudo bash ./install/install.sh --preserve-custom-filters
 ```
 
-The installer makes a complete backup of the original database before writing the merged result, and rolls it back if post-update checks fail. Preserved Fail2Ban filters are not upgraded. The MiniSOC application is not restarted, and its original regex patterns are never edited. Verify the local regex's meaning separately before reloading MiniSOC.
+The installer makes a complete backup of the original database before writing the merged result, and rolls it back if an update fails. Preserved Fail2Ban filters are not upgraded. If only the MiniSOC database changes, Fail2Ban is not reloaded. The MiniSOC application is not restarted, and its original regex patterns are never edited. Verify the local regex's meaning separately before reloading MiniSOC.
 
 ### Fix for customized filters in v1.3.3
 
