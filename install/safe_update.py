@@ -22,10 +22,14 @@ from dataclasses import dataclass
 
 ROOT = Path(__file__).resolve().parents[1]
 FILTERS = ('nginx-skanery.conf', 'nginx-dev-honeypot.conf')
-VERSIONS = ('v1.2.1', 'v1.3.0', 'v1.3.1', 'v1.3.2')
-RELEASE = 'v1.3.3'
+VERSIONS = ('v1.2.1', 'v1.3.0', 'v1.3.1', 'v1.3.2', 'v1.3.3')
+RELEASE = 'v1.3.4'
 
 class UpdateError(Exception):
+    pass
+
+class SignatureParseError(UpdateError):
+    """Existing signature database cannot be parsed without risking data loss."""
     pass
 
 @dataclass
@@ -65,18 +69,18 @@ def parse_db(content: bytes, path: Path) -> dict[str, str]:
             continue
         parts = line.split('|', 3)
         if len(parts) != 4:
-            raise UpdateError(f'Malformed signature {path}:{idx}')
+            raise SignatureParseError(f'Malformed signature {path}:{idx}')
         key, severity, category, pattern = parts
         if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', key):
-            raise UpdateError(f'Invalid signature ID {path}:{idx}')
+            raise SignatureParseError(f'Invalid signature ID {path}:{idx}')
         if severity not in {'HIGH', 'MEDIUM', 'INFO'} or not category or not pattern:
-            raise UpdateError(f'Invalid signature fields {path}:{idx}')
+            raise SignatureParseError(f'Invalid signature fields {path}:{idx}')
         try:
             re.compile(pattern)
         except re.error as exc:
-            raise UpdateError(f'Invalid regex {path}:{idx}: {exc}') from exc
+            raise SignatureParseError(f'Invalid regex {path}:{idx}: {exc}') from exc
         if key in entries:
-            raise UpdateError(f'Duplicate signature ID {key} in {path}')
+            raise SignatureParseError(f'Duplicate signature ID {key} in {path}')
         entries[key] = line
     return entries
 
@@ -175,9 +179,10 @@ def f2b(*args: str) -> None:
         raise UpdateError(f'Fail2Ban {" ".join(args)} failed: {exc}') from exc
 
 
-def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: bool) -> tuple[list[Change], list[Path]]:
+def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: bool) -> tuple[list[Change], list[Path], list[Path]]:
     changes=[]
     preserved=[]
+    preserved_databases=[]
     for name in FILTERS:
         destination = f2b_etc/'filter.d'/name
         no_symlink_parents(destination)
@@ -213,14 +218,25 @@ def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: boo
     if old_db is not None or db.parent.is_dir():
         source=ROOT/'rules'/'signatures-v2.db'
         incoming=source.read_bytes()
-        content=merge_db(old_db,incoming,db,source)
-        if content != old_db:
-            changes.append(Change(db,old_db,content,'add new signature IDs; preserve local rules','minisoc/signatures-v2.db'))
+        # Validate shipped patterns even when a legacy local DB is incompatible.
+        # Never overwrite or silently normalize operator-maintained signatures.
+        parse_db(incoming,source)
+        try:
+            content=merge_db(old_db,incoming,db,source)
+        except SignatureParseError as exc:
+            if old_db is None:
+                raise
+            preserved_databases.append(db)
+            print(f'WARNING PRESERVED {db}: incompatible local signature database ({exc}); '
+                  f'bundled {RELEASE} signatures NOT activated')
+        else:
+            if content != old_db:
+                changes.append(Change(db,old_db,content,'add new signature IDs; preserve local rules','minisoc/signatures-v2.db'))
     elif require_minisoc:
         raise UpdateError(f'MiniSOC signature directory missing: {db.parent}')
     else:
         print(f'SKIPPED {db} (MiniSOC directory absent; standalone Fail2Ban installation)')
-    return changes,preserved
+    return changes,preserved,preserved_databases
 
 
 def digest(raw: bytes | None) -> str | None:
@@ -267,30 +283,38 @@ def restore(changes: list[Change]) -> list[str]:
     return errors
 
 
-def run(dry_run: bool=False, preserve_custom_filters: bool=False) -> None:
+def run(dry_run: bool=False, preserve_custom_filters: bool=False,
+        preserve_custom_signatures: bool=False) -> None:
     if not dry_run and os.geteuid()!=0:
         raise UpdateError('Root privileges required; use sudo or --dry-run')
     base=Path(os.environ.get('F2B_ETC','/etc/fail2ban'))
     db=Path(os.environ.get('MINISOC_SIGNATURES','/etc/minisoc/signatures-v2.db'))
     if not base.is_absolute() or not db.is_absolute():
         raise UpdateError('F2B_ETC and MINISOC_SIGNATURES must be absolute paths')
-    changes,preserved=targets(base,db,os.environ.get('NGINX_LOG'),os.environ.get('MINISOC_REQUIRED')=='1')
+    changes,preserved,preserved_databases=targets(base,db,os.environ.get('NGINX_LOG'),
+                                                 os.environ.get('MINISOC_REQUIRED')=='1')
     for item in changes:
         print(f'{"WOULD UPDATE" if dry_run else "PLAN"} {item.destination}: {item.reason}')
     if dry_run:
         if preserved and not preserve_custom_filters:
             print('REQUIRES REVIEW: a real installation will stop unless --preserve-custom-filters is specified')
+        if preserved_databases and not preserve_custom_signatures:
+            print('REQUIRES REVIEW: a real installation will stop unless --preserve-custom-signatures is specified')
         print('DRY RUN: no file modifications, reload or lock creation')
         return
     if preserved and not preserve_custom_filters:
         raise UpdateError('Customized filters require manual review; no files changed. '
                           'To update other managed files while keeping these filters unchanged, '
                           'rerun with --preserve-custom-filters.')
+    if preserved_databases and not preserve_custom_signatures:
+        raise UpdateError('Incompatible local MiniSOC signature database requires manual review; no files changed. '
+                          'To update other managed files while leaving the database untouched, '
+                          'rerun with --preserve-custom-signatures.')
     if not shutil.which('fail2ban-client'):
         raise UpdateError('fail2ban-client not found')
     if not changes:
-        if preserved:
-            print('PARTIAL: no managed changes; customized filters remain unchanged and unupgraded')
+        if preserved or preserved_databases:
+            print('PARTIAL: no managed changes; incompatible filters/databases remain unchanged and unupgraded')
         else:
             print('Already up to date; no changes necessary')
         return
@@ -330,6 +354,9 @@ def run(dry_run: bool=False, preserve_custom_filters: bool=False) -> None:
         print(f'SUCCESS; backup available at {backup}')
         if preserved:
             print('PARTIAL UPDATE: customized filters were preserved; bundled filter rules NOT activated for them')
+        if preserved_databases:
+            print('PARTIAL UPDATE: incompatible local signature database was preserved; '
+                  'bundled signatures NOT activated for it')
         print('NOTICE: MiniSOC application is not restarted. Reload its signature cache separately if necessary.')
 
 
@@ -338,9 +365,11 @@ def main() -> int:
     parser.add_argument('--dry-run',action='store_true',help='preview only, no mutations')
     parser.add_argument('--preserve-custom-filters',action='store_true',
                         help='explicitly allow a partial update while leaving unknown custom filters unchanged')
+    parser.add_argument('--preserve-custom-signatures',action='store_true',
+                        help='explicitly leave incompatible local MiniSOC signature databases untouched')
     args=parser.parse_args()
     try:
-        run(args.dry_run,args.preserve_custom_filters)
+        run(args.dry_run,args.preserve_custom_filters,args.preserve_custom_signatures)
     except (OSError,UpdateError) as exc:
         print('ERROR:',exc,file=sys.stderr)
         return 1

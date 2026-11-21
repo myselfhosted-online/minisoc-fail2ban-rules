@@ -73,7 +73,20 @@ sudo bash ./install/install.sh
 
 The update preserves existing jail settings, supports conservative merges of known previous filter versions, and merges MiniSOC signatures by ID. Conflicts stop the upgrade without overwriting custom rules. Backups are created before applying changes. The MiniSOC application itself is not restarted.
 
-See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.3 release notes](docs/releases/v1.3.3.md).
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.4 candidate notes](docs/releases/v1.3.4.md).
+
+### Incompatible local signature databases (v1.3.4 candidate)
+
+The v1.3.3 updater could abort even in `--dry-run` while compiling an existing, operator-maintained `/etc/minisoc/signatures-v2.db` regex using Python. A failed validation does **not** prove the live MiniSOC service is broken, nor should the installer rewrite local rules to make them pass. This update distinguishes local incompatibility from an invalid release signature database.
+
+The dry run reports `WARNING PRESERVED` and the location of the local parsing problem without changing files. An ordinary installation still refuses to proceed. If manual review confirms that the local MiniSOC database must remain untouched, explicitly permit a **partial** update:
+
+```bash
+sudo bash ./install/install.sh --dry-run --preserve-custom-filters --preserve-custom-signatures
+sudo bash ./install/install.sh --preserve-custom-filters --preserve-custom-signatures
+```
+
+Only use the preservation flags for components actually reported as incompatible. Preserved local filters and signatures are not upgraded, and the MiniSOC application is not restarted. Before enabling any update, investigate the invalid regex with the operator who maintains that database. Existing signature ID collisions remain fatal and cannot be bypassed.
 
 ### Fix for customized filters in v1.3.3
 

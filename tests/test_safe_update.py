@@ -47,10 +47,10 @@ exit 0
         self.patch_uid.start()
         self.addCleanup(self.patch_uid.stop)
 
-    def execute(self, dry_run=False, preserve_custom_filters=False):
+    def execute(self, dry_run=False, preserve_custom_filters=False, preserve_custom_signatures=False):
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-            module.run(dry_run, preserve_custom_filters)
+            module.run(dry_run, preserve_custom_filters, preserve_custom_signatures)
         return output.getvalue()
 
     def create_installed_filter(self, version="v1.3.0", filename="nginx-skanery.conf", suffix=b""):
@@ -93,6 +93,11 @@ exit 0
         self.execute()
         self.assertEqual(filter_path.read_bytes(), (ROOT / "fail2ban/filter.d/nginx-skanery.conf").read_bytes())
 
+    def test_version_133_baseline_is_recognized(self):
+        filter_path = self.create_installed_filter(version="v1.3.3")
+        self.execute()
+        self.assertEqual(filter_path.read_bytes(), (ROOT / "fail2ban/filter.d/nginx-skanery.conf").read_bytes())
+
     def test_git_not_required_for_exact_known_baseline(self):
         original = (ROOT / 'install/baselines/v1.3.2/nginx-skanery.conf').read_bytes()
         incoming = (ROOT / 'fail2ban/filter.d/nginx-skanery.conf').read_bytes()
@@ -114,7 +119,7 @@ exit 0
         dry_run = self.execute(dry_run=True)
         self.assertIn('WARNING PRESERVED', dry_run)
         self.assertIn('REQUIRES REVIEW', dry_run)
-        self.assertIn('bundled v1.3.3 filter rules NOT activated', dry_run)
+        self.assertIn('bundled v1.3.4 filter rules NOT activated', dry_run)
         with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-filters'):
             self.execute()
         self.assertEqual(installed.read_bytes(), custom)
@@ -161,6 +166,70 @@ exit 0
             self.execute()
         self.assertEqual(self.db.read_text(), current)
         self.assertFalse((self.f2b / "filter.d").exists())
+
+    def test_invalid_legacy_regex_is_reported_and_preserved(self):
+        # Mirrors the production error: regex validation fails on line 1,
+        # but changing this MiniSOC-owned database would be unsafe.
+        legacy = b'operator-rule|HIGH|secret|^)bad-regex\n'
+        self.db.write_bytes(legacy)
+        output = self.execute(dry_run=True)
+        self.assertIn('WARNING PRESERVED', output)
+        self.assertIn('Invalid regex', output)
+        self.assertIn('bundled v1.3.4 signatures NOT activated', output)
+        self.assertIn('--preserve-custom-signatures', output)
+        self.assertEqual(self.db.read_bytes(), legacy)
+        self.assertFalse(self.log.exists())
+        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-signatures'):
+            self.execute()
+        self.assertEqual(self.db.read_bytes(), legacy)
+        self.assertFalse((self.f2b / 'filter.d').exists())
+
+        output = self.execute(preserve_custom_signatures=True)
+        self.assertIn('PARTIAL UPDATE: incompatible local signature database was preserved', output)
+        self.assertEqual(self.db.read_bytes(), legacy)
+        self.assertIn('reload', self.log.read_text())
+        manifests = list(self.f2b.glob('minisoc-backup-*/manifest.json'))
+        self.assertEqual(len(manifests), 1)
+        changed_paths = [row['path'] for row in __import__('json').loads(manifests[0].read_text())['changes']]
+        self.assertNotIn(str(self.db), changed_paths)
+
+    def test_invalid_legacy_db_and_custom_filters_both_require_explicit_preservation(self):
+        custom = b'[Definition]\nfailregex = ^<HOST> .*custom-test\n'
+        path = self.f2b / 'filter.d/nginx-skanery.conf'
+        path.parent.mkdir()
+        path.write_bytes(custom)
+        legacy = b'local-secret|HIGH|secret|^)broken\n'
+        self.db.write_bytes(legacy)
+        plan = self.execute(dry_run=True)
+        self.assertEqual(plan.count('WARNING PRESERVED'), 2)
+        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-signatures'):
+            self.execute(preserve_custom_filters=True)
+        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-filters'):
+            self.execute(preserve_custom_signatures=True)
+        self.assertFalse(self.log.exists())
+        self.assertEqual(self.db.read_bytes(), legacy)
+        self.assertEqual(path.read_bytes(), custom)
+        result = self.execute(preserve_custom_filters=True, preserve_custom_signatures=True)
+        self.assertEqual(result.count('PARTIAL UPDATE:'), 2)
+        self.assertEqual(self.db.read_bytes(), legacy)
+        self.assertEqual(path.read_bytes(), custom)
+
+    def test_preserved_invalid_db_survives_rollback(self):
+        legacy = b'operator-rule|HIGH|secret|^)invalid-regex\n'
+        self.db.write_bytes(legacy)
+        os.environ['FAKE_FAIL_ON_TEST'] = '2'
+        self.addCleanup(os.environ.pop, 'FAKE_FAIL_ON_TEST', None)
+        with self.assertRaisesRegex(module.UpdateError, 'restored automatically'):
+            self.execute(preserve_custom_signatures=True)
+        self.assertEqual(self.db.read_bytes(), legacy)
+        self.assertFalse((self.f2b / 'filter.d/nginx-skanery.conf').exists())
+        self.assertFalse((self.f2b / 'jail.d/minisoc-fail2ban.local').exists())
+
+    def test_corrupt_bundled_db_is_never_silently_preserved(self):
+        source = Path('shipped-signatures.db')
+        invalid = b'bad-shipped-rule|HIGH|secret|^)invalid\n'
+        with self.assertRaisesRegex(module.SignatureParseError, 'Invalid regex'):
+            module.merge_db(b'local|INFO|operator|/ok\n', invalid, self.db, source)
 
     def test_local_override_aborts(self):
         path = self.f2b / "filter.d" / "nginx-skanery.local"

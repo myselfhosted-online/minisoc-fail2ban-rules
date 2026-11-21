@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.4 — 2026-11-21 (candidate; not released)
+
+- Fix a v1.3.3 dry-run failure when a locally installed MiniSOC signature database contains a regex that the updater's Python validator cannot compile (e.g. `Invalid regex /etc/minisoc/signatures-v2.db:1`).
+- Distinguish invalid bundled signatures (still fatal) from incompatible local legacy signatures (preserved for manual review). The dry run now reports `WARNING PRESERVED` rather than aborting before showing the update plan.
+- Default installation remains fail-closed; `--preserve-custom-signatures` explicitly permits a **partial** update of other managed files while leaving the incompatible MiniSOC database byte-for-byte unchanged. This option is independent of `--preserve-custom-filters`; both must be supplied when both components cannot be merged.
+- Add regression tests for the reported line-1 failure, explicit dual preservation, backup manifest exclusions, rollback, and the new v1.3.3 filter baseline.
+- No new blocking rules, no automatic changes to MiniSOC, and no attempt to repair or reinterpret the operator's existing regex.
+
 ## 1.3.3 — 2026-11-21
 
 - Fix the v1.3.2 updater's hard-coded `.git` regex fingerprint, which rejected legitimate locally customized `nginx-skanery.conf` filters even when Git was installed.
