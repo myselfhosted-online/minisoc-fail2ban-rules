@@ -54,8 +54,12 @@ jobs:
       - name: Validate repository
         if: steps.version.outputs.exists != 'true'
         shell: bash
+        env:
+          REQUIRE_FAIL2BAN_REGEX: '1'
         run: |
           set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban
           bash ./scripts/validate.sh
 
       - name: Build release archives

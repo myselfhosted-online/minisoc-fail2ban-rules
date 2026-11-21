@@ -1,0 +1,254 @@
+[
+  {
+    "ip": "198.51.100.21",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T14:48:48+01:00",
+        "path": "/.streamlit/secrets.toml",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/userfiles?path=../../../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/userfiles/x?path=../../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/config/settings.py",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/backend/settings.py",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/cache/original/%2e%2e/.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.21",
+    "jail": "nginx-highconf",
+    "events": [
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/instance/config.py",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/project/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/api/v1/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/services/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/client/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:49+01:00",
+        "path": "/admin/",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.21",
+    "jail": "nginx-fake-searchbots",
+    "events": [
+      {
+        "time": "2026-11-18T14:48:51+01:00",
+        "path": "/.turbo/config.json",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:51+01:00",
+        "path": "/supabase/config.toml",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:51+01:00",
+        "path": "/.changeset/config.json",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:52+01:00",
+        "path": "/.env.secret",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:52+01:00",
+        "path": "/.env.keys",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T14:48:52+01:00",
+        "path": "/.env.prod.local",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.22",
+    "jail": "nginx-highconf",
+    "events": [
+      {
+        "time": "2026-11-18T16:02:14+01:00",
+        "path": "/settings%2F.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:14+01:00",
+        "path": "/static//app/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:14+01:00",
+        "path": "/laravel../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:14+01:00",
+        "path": "/api%2F.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:14+01:00",
+        "path": "/.//.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:14+01:00",
+        "path": "/.git/config%3F.css",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.22",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T16:02:15+01:00",
+        "path": "/.env.prod",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:15+01:00",
+        "path": "/static../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:15+01:00",
+        "path": "/admin/config.json",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:15+01:00",
+        "path": "/app/service-account.json",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:15+01:00",
+        "path": "/docker/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:15+01:00",
+        "path": "/.env.example",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.22",
+    "jail": "nginx-fake-searchbots",
+    "events": [
+      {
+        "time": "2026-11-18T16:02:17+01:00",
+        "path": "/.env.development",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:17+01:00",
+        "path": "/.env.staging",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:17+01:00",
+        "path": "/runtime-config.js",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:17+01:00",
+        "path": "/.env.test",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:17+01:00",
+        "path": "/app-config.json",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T16:02:17+01:00",
+        "path": "/config.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  }
+]

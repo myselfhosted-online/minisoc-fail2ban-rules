@@ -33,3 +33,22 @@ git-packed-refs|HIGH|repository|/\.git/packed-refs(?:$|\?)
 git-info-refs|HIGH|repository|/\.git/info/refs(?:$|\?)
 dotenv-numbered-backup|HIGH|secret|/\.env\.[12](?:$|\?)
 env-backup|HIGH|secret|/env\.(?:bak|old)(?:$|\?)
+
+# Draft additions: observed November 15-16. Additive IDs only; do not rename legacy rules.
+terraform-state-backup|HIGH|infrastructure-state|/terraform\.tfstate\.backup(?:$|\?)
+oauth-client-secrets-root|HIGH|credential|/client_secrets\.json(?:$|\?)
+traversal-encoded-env|HIGH|path-traversal|/api/uploads/(?:%2[eE]%2[eE]%2[fF]){2}\.env(?:$|\?)
+traversal-adjacent-dotenv|HIGH|path-traversal|/(?:uploads|img|public|images)\.\./\.env(?:$|\?)
+
+# 2026-11-18: narrowly scoped secret-path obfuscation and SQL backup enumeration
+backend-encoded-dotenv|HIGH|encoded-secret|/backend/(?:%2[eE]env|%252[eE]env|\.%65nv)(?:$|\?)
+sql-dump-root|HIGH|database-backup|/(?:database|backup|dump)\.sql(?:$|\?)
+
+# 2026-11-18 afternoon: precise traversal, encoded secrets and credential probes
+userfiles-env-query-traversal|HIGH|path-traversal|/userfiles(?:/x)?\?path=(?:\.\./){2,}\.env(?:$|&)
+cache-encoded-dotdot-env|HIGH|path-traversal|/cache/original/%2[eE]%2[eE]/\.env(?:$|\?)
+encoded-slash-env|HIGH|encoded-secret|/(?:settings|api)%2[fF]\.env(?:$|\?)
+git-config-encoded-question|HIGH|repository-encoding|/\.git/config%3[fF]\.css(?:$|\?)
+adjacent-dotenv-static-laravel|HIGH|path-traversal|/(?:static|laravel)\.\./\.env(?:$|\?)
+service-account-json|HIGH|credential|/app/service-account\.json(?:$|\?)
+streamlit-secrets|HIGH|secret|/\.streamlit/secrets\.toml(?:$|\?)

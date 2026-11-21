@@ -1,33 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-test -s "$ROOT/README.md"
-test -s "$ROOT/rules/signatures-v2.db"
-test -s "$ROOT/rules/benign-scanners.list"
-test -s "$ROOT/rules/candidates.list"
-test -s "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
-test -s "$ROOT/fail2ban/filter.d/nginx-dev-honeypot.conf"
-
-grep -q 'Behavior is the indicator' "$ROOT/README.md"
-grep -q 'hellopress-filemanager|HIGH' "$ROOT/rules/signatures-v2.db"
-grep -q 'wp-content-wuhr9|HIGH' "$ROOT/rules/signatures-v2.db"
-grep -q '/wp-content/wuhr9\\.php' "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
-grep -q 'agent-readiness-openid|SAFE_DISCOVERY' "$ROOT/rules/benign-scanners.list"
-grep -q 'urlscan-secret-watcher-dev-injector|TRUSTED_ONLY' "$ROOT/rules/benign-scanners.list"
-
-# October 2026 exact indicators must remain active and tested.
-grep -Fq 'git-internal-credentials|HIGH|credential|' "$ROOT/rules/signatures-v2.db"
-grep -Fq 'kube-config|HIGH|credential|' "$ROOT/rules/signatures-v2.db"
-grep -Fq '/\.kube/config' "$ROOT/fail2ban/filter.d/nginx-skanery.conf"
-grep -Fq '/\.kube/config' "$ROOT/fail2ban/filter.d/nginx-dev-honeypot.conf"
-# Do not assert a literal regex shape: revised branches can preserve behavior.
-# Behavioral regression tests below verify the actual indicators instead.
-grep -Fq 'GET /.kube/config HTTP/1.1' "$ROOT/tests/fixtures/october-2026-new.log"
-grep -Fq 'GET /.git/credentials HTTP/1.1' "$ROOT/tests/fixtures/october-2026-new.log"
-
+for required in \
+  README.md VERSION rules/signatures-v2.db rules/candidates.list rules/benign-scanners.list \
+  fail2ban/filter.d/nginx-skanery.conf fail2ban/filter.d/nginx-dev-honeypot.conf \
+  install/install.sh install/uninstall.sh install/safe_update.py install/safe_uninstall.py; do
+  test -s "$ROOT/$required" || { echo "MISSING $required" >&2; exit 1; }
+done
+bash -n "$ROOT/install/install.sh" "$ROOT/install/uninstall.sh" "$ROOT/install/test.sh"
+python3 -m compileall -q "$ROOT/install" "$ROOT/scripts" "$ROOT/tests"
 python3 "$ROOT/tests/november-regression.py"
 python3 -m unittest discover -s "$ROOT/tests" -p 'test_safe_update.py' -v
-
-echo "PASS: repository structure, active malicious signatures, benign-scanner policy, and review list are valid"
+python3 -m unittest discover -s "$ROOT/tests" -p 'test_working_patch.py' -v
+if command -v fail2ban-regex >/dev/null; then
+  python3 "$ROOT/scripts/verify_fail2ban_filters.py" --filter-dir "$ROOT/fail2ban/filter.d"
+elif [[ "${REQUIRE_FAIL2BAN_REGEX:-0}" == "1" ]]; then
+  echo 'ERROR: fail2ban-regex is required for release CI' >&2
+  exit 1
+else
+  echo 'SKIP: real fail2ban-regex integration unavailable on this machine'
+fi
+echo 'PASS: structure, baseline tests, updater rollback tests, signature fixtures'

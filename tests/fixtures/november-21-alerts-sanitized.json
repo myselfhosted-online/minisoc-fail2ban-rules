@@ -1,0 +1,26 @@
+[
+  {
+    "ip": "198.51.100.29",
+    "jail": "nginx-skanery",
+    "events": [
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.docker/.env","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.aws/.env","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.docker/laravel/app/.env","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.env-example","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.env-sample","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.env.anthropic","status":404,"method":"GET"}
+    ]
+  },
+  {
+    "ip": "198.51.100.29",
+    "jail": "nginx-dev-honeypot",
+    "events": [
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.docker/.env","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.aws/.env","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.docker/laravel/app/.env","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.env-example","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.env-sample","status":404,"method":"GET"},
+      {"time":"2026-11-21T09:04:27+01:00","path":"/.env.anthropic","status":404,"method":"GET"}
+    ]
+  }
+]

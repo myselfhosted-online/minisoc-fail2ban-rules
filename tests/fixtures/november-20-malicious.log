@@ -1,0 +1,6 @@
+198.51.100.20 - - [20/Nov/2026:09:40:12 +0100] "GET /.docker/.env HTTP/1.1" 404 0 "-" "synthetic"
+198.51.100.20 - - [20/Nov/2026:09:40:12 +0100] "GET /.aws/.env HTTP/1.1" 404 0 "-" "synthetic"
+198.51.100.20 - - [20/Nov/2026:09:40:12 +0100] "GET /.env-example HTTP/1.1" 404 0 "-" "synthetic"
+198.51.100.20 - - [20/Nov/2026:09:40:12 +0100] "GET /.docker/laravel/app/.env HTTP/1.1" 404 0 "-" "synthetic"
+198.51.100.20 - - [20/Nov/2026:09:40:12 +0100] "GET /.env-sample HTTP/1.1" 404 0 "-" "synthetic"
+198.51.100.20 - - [20/Nov/2026:09:40:12 +0100] "GET /.env.anthropic HTTP/1.1" 404 0 "-" "synthetic"

@@ -1,22 +1,67 @@
-# Signature candidates under review
-# Format:
-# id|state|category|regex|notes
-#
-# Candidates are evidence under review. They are NOT one-hit blocking policy.
-#
-# Current state:
-# No pending candidates. /wp-content/wuhr9.php was promoted to an exact HIGH
-# WordPress webshell/backdoor-hunting signature in v1.1.1.
-
-# October 2026: keep framework-dependent/encoded probes under review until tested.
-vite-fs-env|REVIEW|secret|/@fs/[^ ?]*\.env(?:\?|$)|Vite file access probe; verify request-target parsing and legitimate use
-encoded-dotdot-slash|REVIEW|traversal|\.\.%2[fF]|Encoded traversal marker; context required, never standalone ban
-ntfs-ads-dotenv|REVIEW|secret|/\.env[^ ?]*::\$DATA|NTFS ADS-looking probe; validate decoding and escaping
-
-# November 2026: context-only review; never one-hit blocking
-wp-json-enumeration|REVIEW|wordpress-recon|/(?:blog/|wp/|wordpress/|site/|news/)?wp-json/?(?:$|\?)|Suspicious only as a burst across installation prefixes
-wordpress-php-enumeration|REVIEW|wordpress-suspicious-php|/wp-(?:sanita|devirot|devirus|devisue|conflg|access)\.php(?:$|\?)|Correlate bursts; do not one-hit ban
-backup-env-family|REVIEW|env-backup-enumeration|/(?:\.env\.[0-9]+|env\.(?:bak|old|save))(?:$|\?)|Multiple backup probes required for escalation
+# Signature candidates under review: NOT one-hit blocking rules.
+# Format: id|state|category|regex|notes
+vite-fs-env|REVIEW|secret|/@fs/[^ ?]*\.env(?:\?|$)|Vite probe: verify target parsing and legitimate use
+encoded-dotdot-slash|REVIEW|traversal|\.\.%2[fF]|Encoded traversal: context required
+ntfs-ads-dotenv|REVIEW|secret|/\.env[^ ?]*::\$DATA|NTFS ADS-looking probe; validate escaping
+wp-json-enumeration|REVIEW|wordpress-recon|/(?:blog/|wp/|wordpress/|site/|news/)?wp-json/?(?:$|\?)|Suspicious only as a burst across install prefixes
+wordpress-php-enumeration|REVIEW|wordpress-suspicious-php|/wp-(?:sanita|devirot|devirus|devisue|conflg|access)\.php(?:$|\?)|Correlate bursts; not one-hit ban
+backup-env-family|REVIEW|env-backup-enumeration|/(?:\.env\.[0-9]+|env\.(?:bak|old|save))(?:$|\?)|Multiple backup probes required
 wp-maljum-php|REVIEW|wordpress-suspicious-php|/wp-content/maljum\.php(?:$|\?)|Observed 2026-11-15; unconfirmed webshell
 wp-track3-php|REVIEW|wordpress-suspicious-php|/wp-track3\.php(?:$|\?)|Observed 2026-11-15; unconfirmed webshell
 wp-sample-php|REVIEW|wordpress-suspicious-php|/wp-sample\.php(?:$|\?)|Observed 2026-11-15; unconfirmed webshell
+
+# 2026-11-15: cloud and infrastructure reconnaissance
+flowise-credentials-api|REVIEW|ai-service-credentials|/flowise/api/v1/credentials(?:$|\?)|Could be an application endpoint; correlate authorization and scanning behavior
+ci-workflow-yaml|REVIEW|ci-repository-disclosure|/\.github/workflows/[^ ?]+\.ya?ml(?:$|\?)|CI metadata probe; some workflows are public
+firebase-config-js|REVIEW|frontend-config-discovery|/firebaseConfig\.js(?:$|\?)|May be a legitimate public frontend asset
+configuration-js|REVIEW|frontend-config-discovery|/configuration\.js(?:$|\?)|May be a legitimate public frontend asset
+settings-percent-env|REVIEW|encoded-path-secret|/settings%2[fF]\.env(?:$|\?)|Encoded slash; inspect before escalation
+
+# 2026-11-16: six-path configuration/credentials burst; no single-path HIGH bans
+config-json-root|REVIEW|config-discovery|/config\.json(?:$|\?)|Common legitimate application asset; require multiple probes
+config-json-subdir|REVIEW|config-discovery|/config/config\.json(?:$|\?)|Require correlated burst
+config-yaml-root|REVIEW|config-discovery|/config\.ya?ml(?:$|\?)|Require correlated burst
+credential-file-candidates|REVIEW|credential-file-discovery|/(?:credentials\.json|credentials\.ya?ml)(?:$|\?)|Require corroborating probes
+
+# 2026-11-18: WP probe family; suspicious but not proof of deployed webshell
+wordpress-filemanager-typo|REVIEW|wordpress-suspicious-php|/wp-filemannger\.php(?:$|\?)|Filemanager lookalike, combine with WP probing
+wordpress-tinymce-index|REVIEW|wordpress-suspicious-php|/wp-includes/js/tinymce/index\.php(?:\?|$)|Probe included p= query, not one-hit ban
+wordpress-wp-gans|REVIEW|wordpress-suspicious-php|/wp-gans\.php(?:$|\?)|Repeated across Microsoft Azure scan episodes
+wordpress-admin-about|REVIEW|wordpress-suspicious-php|/wp-admin/css/about\.php(?:$|\?)|Correlate with adjacent anomalous PHP paths
+wordpress-maint-login|REVIEW|wordpress-suspicious-php|/wp-admin/maint/wp-login\.php(?:$|\?)|Suspicious nested wp-login.php, not one-hit ban
+
+# 2026-11-18: configuration and privileged API probing
+circleci-yaml|REVIEW|ci-configuration|/\.circleci/config\.ya?ml(?:$|\?)|CI config can legitimately be public
+kubernetes-secret-api|REVIEW|kubernetes-api-discovery|/api/v1/namespaces/[^/?]+/secrets(?:$|\?)|Could be a legitimate API endpoint; context required
+
+# 2026-11-18 afternoon: do not one-hit ban normal public app config files
+python-settings-discovery|REVIEW|python-config-discovery|/(?:config/settings|backend/settings|instance/config)\.py(?:$|\?)|Correlate with secret-access probes
+supabase-config|REVIEW|cloud-service-config|/supabase/config\.toml(?:$|\?)|May be published intentionally; investigate
+turbo-changeset-config|REVIEW|build-tool-config|/\.(?:turbo|changeset)/config\.json(?:$|\?)|May contain public build configuration
+runtime-config-js|REVIEW|frontend-config-discovery|/runtime-config\.js(?:$|\?)|May be legitimate frontend asset
+app-config-json|REVIEW|frontend-config-discovery|/app-config\.json(?:$|\?)|May be legitimate frontend asset
+admin-config-json|REVIEW|admin-config-discovery|/admin/config\.json(?:$|\?)|Application-dependent, require corroboration
+config-env-root|REVIEW|env-config-discovery|/config\.env(?:$|\?)|Context-dependent, require corroboration
+
+# 2026-11-18 evening: restricted file-read APIs and further WP PHP enumeration
+# The supplied Telegram text displays "&amp;" in two query strings; verify
+# raw Nginx escaping before considering a promotion to active Fail2Ban regexes.
+api-system-fileview-env|REVIEW|api-file-read-secret|/api/system/fileView\?file=/app/\.env(?:$|&)|API file-view targeting an env file; verify actual route and Nginx escaping
+api-fs-outside-workspace-env|REVIEW|api-file-read-secret|/api/fs/read\?allowOutsideWorkspace=true(?:&|&amp;)path=/app/\.env(?:$|&)|Attempts reading env outside workspace; not a generic /api/fs/read ban
+api-console-traversal-env|REVIEW|api-query-traversal|/api/console/api_server\?sense_version=%40%40SENSE_VERSION(?:&|&amp;)apis=(?:\.\./){3,}\.env(?:$|&)|Query-based env traversal; check whether pasted &amp; is display escaped
+adjacent-dotenv-media|REVIEW|path-traversal-variant|/media\.\./\.env(?:$|\?)|Adjacent-dot path; not necessarily traversal unless server routing is vulnerable
+php-configuration-backup|REVIEW|php-config-backup|/configuration\.php\.bak(?:$|\?)|Potential sensitive backup, review in context
+wordpress-optimizer-php|REVIEW|wordpress-suspicious-php|/wp-optimizer\.php(?:$|\?)|Unconfirmed PHP probe; correlate with recurring Azure batches
+wordpress-login-lookalike-capital-i|REVIEW|wordpress-obfuscated-login|/wp-Iogin\.php(?:$|\?)|Capital I rather than lowercase l in login; preserve case for evidence
+wordpress-config-query|REVIEW|php-config-probe|/config\.php\?(?:$|[^ ]*)|Observed trailing question mark; may be legitimate, never one-hit ban
+
+# 2026-11-19: combined config, secret and SQL backup enumeration (same IP/second)
+secrets-json-yaml|REVIEW|secret-file-discovery|/secrets\.(?:json|ya?ml)(?:$|\?)|Sensitive-looking file, but require corroboration before active one-hit ban
+env-frontend-js|REVIEW|frontend-env-discovery|/env\.js(?:$|\?)|May be a deliberately public frontend configuration file; avoid one-hit bans
+env-frontend-double-underscore|REVIEW|frontend-env-discovery|/__ENV\.js(?:$|\?)|May be deliberately public runtime configuration; case-sensitive review
+
+# 2026-11-19 late: WP anomalies and secret/backup enumeration; NOT standalone bans
+wordpress-xserver-php|REVIEW|wordpress-suspicious-php|/wp-xserver\.php(?:\?|$)|Possible malicious PHP probe; corroborate other WP anomaly requests
+wordpress-double-slash-l10n|REVIEW|wordpress-path-anomaly|//wp-includes/l10n/(?:$|\?)|Double slash may also be an innocent URL typo; review in context
+site-zip-archive|REVIEW|site-archive-discovery|/site\.zip(?:$|\?)|Potential website backup archive, require multiple sensitive probes
+sendgrid-env|REVIEW|third-party-env-discovery|/sendgrid\.env(?:$|\?)|Potential email service secret exposure, corroborate with .env probes

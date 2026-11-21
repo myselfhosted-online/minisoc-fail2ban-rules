@@ -1,0 +1,296 @@
+[
+  {
+    "ip": "198.51.100.23",
+    "jail": "nginx-highconf",
+    "events": [
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/api/system/fileView?file=/app/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/api/console/api_server?sense_version=%40%40SENSE_VERSION&amp;apis=../../../../../../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/api/fs/read?allowOutsideWorkspace=true&amp;path=/app/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/laravel/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/.env.php.bak",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/configuration.php.bak",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.23",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/api/system/fileView?file=/app/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/api/console/api_server?sense_version=%40%40SENSE_VERSION&amp;apis=../../../../../../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/api/fs/read?allowOutsideWorkspace=true&amp;path=/app/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/laravel/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/.env.php.bak",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/configuration.php.bak",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.23",
+    "jail": "nginx-fake-searchbots",
+    "events": [
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/laravel/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/.env.php.bak",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/configuration.php.bak",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/wp-config.old",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/storage/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T18:37:31+01:00",
+        "path": "/wp/.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.24",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T19:59:08+01:00",
+        "path": "/.env.supabase",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:08+01:00",
+        "path": "/admin/config.json",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:08+01:00",
+        "path": "/static//app/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:08+01:00",
+        "path": "/static../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:08+01:00",
+        "path": "/media../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:08+01:00",
+        "path": "/.turbo/config.json",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.24",
+    "jail": "nginx-highconf",
+    "events": [
+      {
+        "time": "2026-11-18T19:59:10+01:00",
+        "path": "/prisma/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:10+01:00",
+        "path": "/.env.shared",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:10+01:00",
+        "path": "/.env.common",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:10+01:00",
+        "path": "/api/.env/public/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:10+01:00",
+        "path": "/.env.monorepo",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:10+01:00",
+        "path": "/api/console/api_server?sense_version=%40%40SENSE_VERSION&amp;apis=../../../../../../.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.24",
+    "jail": "nginx-fake-searchbots",
+    "events": [
+      {
+        "time": "2026-11-18T19:59:12+01:00",
+        "path": "/.env.old",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:12+01:00",
+        "path": "/.env.save",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:12+01:00",
+        "path": "/.env.prod",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:12+01:00",
+        "path": "/admin/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:12+01:00",
+        "path": "/api/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T19:59:12+01:00",
+        "path": "/backend/.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.25",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T22:19:01+01:00",
+        "path": "/wp-content/plugins/hellopress/wp_filemanager.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T22:19:03+01:00",
+        "path": "/wp-optimizer.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T22:19:03+01:00",
+        "path": "/wp-Iogin.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T22:19:03+01:00",
+        "path": "/wp-devirot.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T22:19:03+01:00",
+        "path": "/wp-devirus.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T22:19:06+01:00",
+        "path": "/config.php?",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  }
+]
