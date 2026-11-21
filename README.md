@@ -73,7 +73,27 @@ sudo bash ./install/install.sh
 
 The update preserves existing jail settings, supports conservative merges of known previous filter versions, and merges MiniSOC signatures by ID. Conflicts stop the upgrade without overwriting custom rules. Backups are created before applying changes. The MiniSOC application itself is not restarted.
 
-See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.3 release notes](docs/releases/v1.3.3.md).
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.4 release notes](docs/releases/v1.3.4.md).
+
+### Merge old and new MiniSOC signatures by ID (v1.3.4)
+
+The v1.3.3 updater could abort even in `--dry-run` while compiling an existing, operator-maintained `/etc/minisoc/signatures-v2.db` regex using Python. A failed validation does **not** prove the live MiniSOC service is broken. The updated installer accepts the existing database's legacy regex syntax as-is, validates all bundled additions, and builds **one merged database at the same path**.
+
+Merge policy:
+
+- Existing ID unchanged, including any old regex: **keep the original**.
+- New ID absent locally: **append the new bundled entry**.
+- Same ID but a different bundled definition: **skip the bundled definition and warn**, keeping the existing local one.
+- Broken local database *structure* (invalid ID syntax, malformed rows, unsupported encoding): preserve the entire database, warn, and require explicit `--preserve-custom-signatures` for a partial update. Invalid **bundled** regexes always abort.
+
+Because existing custom Fail2Ban filters may also require preservation, the reported Debian case uses:
+
+```bash
+sudo bash ./install/install.sh --dry-run --preserve-custom-filters
+sudo bash ./install/install.sh --preserve-custom-filters
+```
+
+The installer makes a complete backup of the original database before writing the merged result, and rolls it back if post-update checks fail. Preserved Fail2Ban filters are not upgraded. The MiniSOC application is not restarted, and its original regex patterns are never edited. Verify the local regex's meaning separately before reloading MiniSOC.
 
 ### Fix for customized filters in v1.3.3
 

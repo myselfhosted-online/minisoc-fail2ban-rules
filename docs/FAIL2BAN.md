@@ -216,14 +216,29 @@ The updater:
 
 1. checks for local filter overrides and unknown versions before modifying files;
 2. preserves existing jail settings such as `bantime`, `maxretry`, and `logpath`;
-3. merges filters conservatively against bundled v1.2.1/v1.3.0/v1.3.1/v1.3.2 baselines; conflicting local changes require manual review;
-4. merges `/etc/minisoc/signatures-v2.db` by signature ID, preserving custom entries and rejecting conflicting IDs;
+3. merges filters conservatively against bundled v1.2.1/v1.3.0/v1.3.1/v1.3.2/v1.3.3 baselines; conflicting local changes require manual review;
+4. merges `/etc/minisoc/signatures-v2.db` by signature ID, preserving custom entries and skipping conflicting incoming IDs with a warning;
 5. creates root-protected backups under `/etc/fail2ban/minisoc-backup-*`;
 6. validates and reloads Fail2Ban, restoring files and attempting to reload the previous configuration if an update fails.
 
 If MiniSOC is not installed, its signature update is skipped. Set `MINISOC_SIGNATURES=/absolute/path` to specify a different database or `MINISOC_REQUIRED=1` to require it. The installer does **not** restart MiniSOC; if its classification engine caches the database, it needs a separate reload.
 
 A safe update cannot automatically resolve all user-modified regexes. On conflict, **do not force an overwrite**: review the local rule and reconcile it with the new upstream filter.
+
+### Merge old and new MiniSOC signature databases (v1.3.4 candidate)
+
+If a local `signatures-v2.db` contains a regex that Python cannot compile, v1.3.3 may stop during the dry run, e.g. `Invalid regex /etc/minisoc/signatures-v2.db:1: unbalanced parenthesis at position 1`. The new updater preserves that existing regex byte-for-byte and continues, warning that the existing syntax is not Python-compatible. It does not assume the active MiniSOC service is broken.
+
+The old and new entries are combined into **one file**, `/etc/minisoc/signatures-v2.db`. The merge always gives priority to existing IDs and appends only genuinely new IDs; conflicting incoming definitions are skipped with `WARNING SKIPPED EXISTING IDs` and do not block the update. A backup of the complete original database is created before the merge is written, and rollback restores those exact bytes on failure.
+
+If existing custom Fail2Ban filters need preservation, explicitly allow a **partial filter update** while still merging the signature database:
+
+```bash
+sudo bash ./install/install.sh --dry-run --preserve-custom-filters
+sudo bash ./install/install.sh --preserve-custom-filters
+```
+
+Only if the existing signature database has an unparseable **record structure** (rather than merely a legacy regex dialect) does the updater preserve the entire local file for review. `--preserve-custom-signatures` then explicitly skips updating that database while allowing independent updates to continue. An invalid regex in the **bundled** signature database always stops the update. Neither mode silently rewrites operator-defined regexes or restarts the MiniSOC application.
 
 ### Customized filter compatibility (v1.3.3)
 
