@@ -78,12 +78,15 @@ class Patches(unittest.TestCase):
         self.assertFalse((self.etc/'filter.d').exists())
         self.f2b.assert_not_called()
 
-    def test_custom_signature_conflict_fails_before_changes(self):
+    def test_custom_signature_conflict_preserves_local_and_appends_missing(self):
         self.db.write_text('git-head|INFO|custom|/other\n')
-        with self.assertRaisesRegex(update.UpdateError,'Signature ID conflicts'):
-            update.run()
-        self.assertFalse((self.etc/'filter.d').exists())
-        self.f2b.assert_not_called()
+        update.run()
+        merged = self.db.read_text()
+        self.assertTrue(merged.startswith('git-head|INFO|custom|/other\n'))
+        self.assertEqual(merged.count('git-head|'),1)
+        self.assertIn('dotenv-basic|HIGH|secret|',merged)
+        self.assertTrue((self.etc/'filter.d').is_dir())
+        self.assertTrue(self.f2b.called)
 
     def test_unknown_local_filter_is_not_overwritten(self):
         path=self.etc/'filter.d'/'nginx-skanery.conf';path.parent.mkdir()

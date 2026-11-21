@@ -3,10 +3,11 @@
 ## 1.3.4 — 2026-11-21 (candidate; not released)
 
 - Fix a v1.3.3 dry-run failure when a locally installed MiniSOC signature database contains a regex that the updater's Python validator cannot compile (e.g. `Invalid regex /etc/minisoc/signatures-v2.db:1`).
-- Distinguish invalid bundled signatures (still fatal) from incompatible local legacy signatures (preserved for manual review). The dry run now reports `WARNING PRESERVED` rather than aborting before showing the update plan.
-- Default installation remains fail-closed; `--preserve-custom-signatures` explicitly permits a **partial** update of other managed files while leaving the incompatible MiniSOC database byte-for-byte unchanged. This option is independent of `--preserve-custom-filters`; both must be supplied when both components cannot be merged.
-- Add regression tests for the reported line-1 failure, explicit dual preservation, backup manifest exclusions, rollback, and the new v1.3.3 filter baseline.
-- No new blocking rules, no automatic changes to MiniSOC, and no attempt to repair or reinterpret the operator's existing regex.
+- Merge existing and bundled signature databases into the same `/etc/minisoc/signatures-v2.db`: preserve all existing lines verbatim and append only IDs not already present. Existing regexes are not rejected solely because Python cannot compile their legacy syntax; warn for operator review.
+- When an ID already exists with a different definition, **keep the local entry and skip the incoming one**, with an explicit warning; never create duplicate IDs or stop solely for an ID collision.
+- Validate bundled regexes strictly; structurally unreadable local databases are preserved for review and may be explicitly skipped via `--preserve-custom-signatures` during a partial update.
+- Add regression tests for the reported line-1 failure, append-only union, conflict precedence, dual preservation, backup of the complete original database, rollback, and the new v1.3.3 filter baseline.
+- No new blocking rules, no automatic MiniSOC application restart, and no attempt to rewrite existing local regexes.
 
 ## 1.3.3 — 2026-11-21
 

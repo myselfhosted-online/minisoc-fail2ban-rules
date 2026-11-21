@@ -159,46 +159,109 @@ exit 0
         self.assertEqual(filter_path.read_bytes(), content)
         self.assertFalse((self.f2b / "jail.d").exists())
 
-    def test_conflicting_signature_id_aborts_without_writes(self):
+    def test_conflicting_signature_id_keeps_local_and_adds_new_ids(self):
         current = "git-head|MEDIUM|repository|/custom-path\n"
         self.db.write_text(current)
-        with self.assertRaisesRegex(module.UpdateError, "git-head"):
-            self.execute()
+        plan = self.execute(dry_run=True)
+        self.assertIn('WARNING SKIPPED EXISTING IDs: git-head', plan)
         self.assertEqual(self.db.read_text(), current)
-        self.assertFalse((self.f2b / "filter.d").exists())
+        output = self.execute()
+        self.assertIn('WARNING SKIPPED EXISTING IDs: git-head', output)
+        merged = self.db.read_text()
+        self.assertTrue(merged.startswith(current))
+        self.assertEqual(merged.count('git-head|'), 1)
+        self.assertIn('dotenv-basic|HIGH|secret|', merged)
+        self.assertIn('reload', self.log.read_text())
+        self.assertIn('Already up to date', self.execute())
 
-    def test_invalid_legacy_regex_is_reported_and_preserved(self):
-        # Mirrors the production error: regex validation fails on line 1,
-        # but changing this MiniSOC-owned database would be unsafe.
+    def test_existing_database_crlf_bytes_and_regex_pipes_survive_merge(self):
+        existing = (b'# operator notes\r\n'
+                    b'custom-pipe|MEDIUM|operator|/(?:first|second)(?:$|\\?)\r\n'
+                    b'git-head|INFO|custom|/git-is-private\r\n')
+        source = ROOT / 'rules/signatures-v2.db'
+        merged = module.merge_db(existing, source.read_bytes(), self.db, source)
+        self.assertTrue(merged.startswith(existing))
+        self.assertEqual(merged.count(b'git-head|'), 1)
+        self.assertEqual(merged.count(b'custom-pipe|'), 1)
+        self.assertIn(b'\r\n# Added by MiniSOC v1.3.4\r\n', merged)
+        self.assertEqual(merged.count(b'\n'), merged.count(b'\r\n'))
+        self.assertEqual(module.merge_db(merged, source.read_bytes(), self.db, source), merged)
+
+    def test_existing_database_without_final_newline_preserved(self):
+        existing = b'operator-rule|INFO|operator|/already-exists'
+        source = ROOT / 'rules/signatures-v2.db'
+        merged = module.merge_db(existing, source.read_bytes(), self.db, source)
+        self.assertTrue(merged.startswith(existing + b'\n\n# Added by MiniSOC v1.3.4\n'))
+        self.assertEqual(merged.count(b'operator-rule|'), 1)
+        self.assertEqual(module.merge_db(merged, source.read_bytes(), self.db, source), merged)
+
+    def test_empty_installed_database_uses_exact_bundled_content(self):
+        self.db.write_bytes(b'')
+        output = self.execute()
+        self.assertIn('SUCCESS', output)
+        self.assertEqual(self.db.read_bytes(), (ROOT / 'rules/signatures-v2.db').read_bytes())
+
+    def test_non_utf8_existing_database_is_preserved_without_loss(self):
+        raw = b'\xff\xfelocal-data\n'
+        self.db.write_bytes(raw)
+        preview = self.execute(dry_run=True)
+        self.assertIn('WARNING PRESERVED', preview)
+        self.assertIn('Invalid UTF-8', preview)
+        self.assertEqual(self.db.read_bytes(), raw)
+        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-signatures'):
+            self.execute()
+        self.assertEqual(self.db.read_bytes(), raw)
+
+    def test_duplicate_ids_in_bundled_signatures_rejected(self):
+        malformed = (b'duplicate|HIGH|secret|/first\n'
+                     b'duplicate|INFO|operator|/second\n')
+        with self.assertRaisesRegex(module.SignatureParseError, 'Duplicate signature ID duplicate'):
+            module.merge_db(b'local|INFO|operator|/ok\n', malformed, self.db, Path('bundled-db'))
+
+    def test_invalid_python_legacy_regex_is_retained_in_merged_database(self):
+        # Reproduces production line-1 failure without changing its regex.
         legacy = b'operator-rule|HIGH|secret|^)bad-regex\n'
         self.db.write_bytes(legacy)
         output = self.execute(dry_run=True)
-        self.assertIn('WARNING PRESERVED', output)
-        self.assertIn('Invalid regex', output)
-        self.assertIn('bundled v1.3.4 signatures NOT activated', output)
-        self.assertIn('--preserve-custom-signatures', output)
+        self.assertIn('WARNING EXISTING REGEX', output)
+        self.assertIn('unbalanced parenthesis at position 1', output)
+        self.assertIn(f'WOULD UPDATE {self.db}', output)
+        self.assertNotIn(f'WARNING PRESERVED {self.db}', output)
         self.assertEqual(self.db.read_bytes(), legacy)
         self.assertFalse(self.log.exists())
-        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-signatures'):
-            self.execute()
-        self.assertEqual(self.db.read_bytes(), legacy)
-        self.assertFalse((self.f2b / 'filter.d').exists())
-
-        output = self.execute(preserve_custom_signatures=True)
-        self.assertIn('PARTIAL UPDATE: incompatible local signature database was preserved', output)
-        self.assertEqual(self.db.read_bytes(), legacy)
+        output = self.execute()
+        merged = self.db.read_bytes()
+        self.assertTrue(merged.startswith(legacy))
+        self.assertIn(b'git-head|HIGH|repository|', merged)
+        self.assertEqual(merged.count(b'operator-rule|'), 1)
         self.assertIn('reload', self.log.read_text())
         manifests = list(self.f2b.glob('minisoc-backup-*/manifest.json'))
         self.assertEqual(len(manifests), 1)
-        changed_paths = [row['path'] for row in __import__('json').loads(manifests[0].read_text())['changes']]
-        self.assertNotIn(str(self.db), changed_paths)
+        records = __import__('json').loads(manifests[0].read_text())['changes']
+        db_record = next(row for row in records if row['path'] == str(self.db))
+        self.assertEqual((manifests[0].parent / db_record['backup_file']).read_bytes(), legacy)
+        self.assertIn('Already up to date', self.execute())
+
+    def test_malformed_local_database_is_preserved_without_overwriting(self):
+        legacy = b'operator-rule|HIGH|secret\n'
+        self.db.write_bytes(legacy)
+        plan = self.execute(dry_run=True)
+        self.assertIn(f'WARNING PRESERVED {self.db}', plan)
+        self.assertIn('--preserve-custom-signatures', plan)
+        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-signatures'):
+            self.execute()
+        self.assertEqual(self.db.read_bytes(), legacy)
+        self.assertFalse(self.log.exists())
+        output = self.execute(preserve_custom_signatures=True)
+        self.assertIn('PARTIAL UPDATE: incompatible local signature database was preserved', output)
+        self.assertEqual(self.db.read_bytes(), legacy)
 
     def test_invalid_legacy_db_and_custom_filters_both_require_explicit_preservation(self):
         custom = b'[Definition]\nfailregex = ^<HOST> .*custom-test\n'
         path = self.f2b / 'filter.d/nginx-skanery.conf'
         path.parent.mkdir()
         path.write_bytes(custom)
-        legacy = b'local-secret|HIGH|secret|^)broken\n'
+        legacy = b'local-secret|HIGH|secret\n'
         self.db.write_bytes(legacy)
         plan = self.execute(dry_run=True)
         self.assertEqual(plan.count('WARNING PRESERVED'), 2)
@@ -214,13 +277,13 @@ exit 0
         self.assertEqual(self.db.read_bytes(), legacy)
         self.assertEqual(path.read_bytes(), custom)
 
-    def test_preserved_invalid_db_survives_rollback(self):
+    def test_merged_legacy_db_survives_rollback(self):
         legacy = b'operator-rule|HIGH|secret|^)invalid-regex\n'
         self.db.write_bytes(legacy)
         os.environ['FAKE_FAIL_ON_TEST'] = '2'
         self.addCleanup(os.environ.pop, 'FAKE_FAIL_ON_TEST', None)
         with self.assertRaisesRegex(module.UpdateError, 'restored automatically'):
-            self.execute(preserve_custom_signatures=True)
+            self.execute()
         self.assertEqual(self.db.read_bytes(), legacy)
         self.assertFalse((self.f2b / 'filter.d/nginx-skanery.conf').exists())
         self.assertFalse((self.f2b / 'jail.d/minisoc-fail2ban.local').exists())
@@ -270,6 +333,11 @@ exit 0
         dst.parent.mkdir()
         dst.symlink_to(self.base / "elsewhere")
         with self.assertRaisesRegex(module.UpdateError, "symlink"):
+            self.execute()
+
+    def test_reject_symlink_in_existing_database(self):
+        self.db.symlink_to(self.base / 'unexpected-signatures.db')
+        with self.assertRaisesRegex(module.UpdateError, 'symlink'):
             self.execute()
 
 if __name__ == "__main__":

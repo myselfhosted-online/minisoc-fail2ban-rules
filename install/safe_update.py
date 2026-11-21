@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail-closed MiniSOC/Fail2Ban updater: preflight, merge, backup, rollback.
 
-Requires Python >=3.9, git only for three-way filter merges, and fail2ban-client
+Requires Python >=3.10, git only for three-way filter merges, and fail2ban-client
 for an actual install. --dry-run is non-mutating; tests use isolated fake clients.
 """
 from __future__ import annotations
@@ -58,11 +58,11 @@ def no_symlink_parents(path: Path) -> None:
             raise UpdateError(f'Refusing symlink in destination path: {parent}')
 
 
-def parse_db(content: bytes, path: Path) -> dict[str, str]:
+def parse_db(content: bytes, path: Path, *, validate_regex: bool=True) -> dict[str, str]:
     try:
         text = content.decode('utf-8')
     except UnicodeDecodeError as exc:
-        raise UpdateError(f'Invalid UTF-8 in {path}') from exc
+        raise SignatureParseError(f'Invalid UTF-8 in {path}') from exc
     entries = {}
     for idx, line in enumerate(text.splitlines(), 1):
         if not line.strip() or line.lstrip().startswith('#'):
@@ -75,10 +75,11 @@ def parse_db(content: bytes, path: Path) -> dict[str, str]:
             raise SignatureParseError(f'Invalid signature ID {path}:{idx}')
         if severity not in {'HIGH', 'MEDIUM', 'INFO'} or not category or not pattern:
             raise SignatureParseError(f'Invalid signature fields {path}:{idx}')
-        try:
-            re.compile(pattern)
-        except re.error as exc:
-            raise SignatureParseError(f'Invalid regex {path}:{idx}: {exc}') from exc
+        if validate_regex:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                raise SignatureParseError(f'Invalid regex {path}:{idx}: {exc}') from exc
         if key in entries:
             raise SignatureParseError(f'Duplicate signature ID {key} in {path}')
         entries[key] = line
@@ -89,15 +90,33 @@ def merge_db(previous: bytes | None, incoming: bytes, destination: Path, source:
     new_entries = parse_db(incoming, source)
     if previous is None:
         return incoming
-    old_entries = parse_db(previous, destination)
+    if not previous:
+        return incoming
+    # Already-running MiniSOC installations may contain legacy patterns from a
+    # different regex dialect. Keep them byte-for-byte; only shipped additions
+    # must compile with Python. Never silently drop a local signature.
+    old_entries = parse_db(previous, destination, validate_regex=False)
+    for idx, line in enumerate(previous.decode('utf-8').splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        pattern = line.split('|', 3)[3]
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            print(f'WARNING EXISTING REGEX {destination}:{idx}: not Python-compatible ({exc}); '
+                  'original signature retained unchanged')
     collisions = sorted(k for k in old_entries.keys() & new_entries.keys() if old_entries[k] != new_entries[k])
     if collisions:
-        raise UpdateError('Signature ID conflicts; no changes made: '+', '.join(collisions))
+        print('WARNING SKIPPED EXISTING IDs: '+', '.join(collisions)+
+              '; local definitions take precedence; incoming definitions NOT installed')
     additions = [line for key, line in new_entries.items() if key not in old_entries]
     if not additions:
         return previous
-    separator = b'' if previous.endswith(b'\n') else b'\n'
-    return previous + separator + f'\n# Added by MiniSOC {RELEASE}\n'.encode() + ('\n'.join(additions) + '\n').encode('utf-8')
+    # Preserve the existing bytes and use its newline convention for additions.
+    newline = b'\r\n' if b'\r\n' in previous and previous.count(b'\n') == previous.count(b'\r\n') else b'\n'
+    separator = b'' if previous.endswith(b'\n') else newline
+    suffix = (f'\n# Added by MiniSOC {RELEASE}\n' + '\n'.join(additions) + '\n').encode('utf-8')
+    return previous + separator + suffix.replace(b'\n', newline)
 
 
 def filter_merge(current: bytes | None, incoming: bytes, filename: str) -> tuple[bytes, str]:
@@ -218,8 +237,8 @@ def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: boo
     if old_db is not None or db.parent.is_dir():
         source=ROOT/'rules'/'signatures-v2.db'
         incoming=source.read_bytes()
-        # Validate shipped patterns even when a legacy local DB is incompatible.
-        # Never overwrite or silently normalize operator-maintained signatures.
+        # Validate shipped patterns even when a legacy local DB has syntax the
+        # Python regex engine cannot compile; existing signatures are never rewritten.
         parse_db(incoming,source)
         try:
             content=merge_db(old_db,incoming,db,source)
@@ -227,7 +246,7 @@ def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: boo
             if old_db is None:
                 raise
             preserved_databases.append(db)
-            print(f'WARNING PRESERVED {db}: incompatible local signature database ({exc}); '
+            print(f'WARNING PRESERVED {db}: invalid local signature database structure ({exc}); '
                   f'bundled {RELEASE} signatures NOT activated')
         else:
             if content != old_db:
