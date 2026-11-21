@@ -1,0 +1,86 @@
+[
+  {
+    "ip": "198.51.100.26",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/config.yaml",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/config.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/credentials.yml",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/credentials.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/secrets.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/secrets.yml",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.26",
+    "jail": "nginx-dev-honeypot",
+    "events": [
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/database.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/site/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/backup.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/dump.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/env.js",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T10:16:14+01:00",
+        "path": "/__ENV.js",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  }
+]

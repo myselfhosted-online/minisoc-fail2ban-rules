@@ -216,22 +216,33 @@ The updater:
 
 1. checks for local filter overrides and unknown versions before modifying files;
 2. preserves existing jail settings such as `bantime`, `maxretry`, and `logpath`;
-3. merges filters conservatively against bundled v1.2.1/v1.3.0 baselines; conflicting local changes require manual review;
+3. merges filters conservatively against bundled v1.2.1/v1.3.0/v1.3.1 baselines; conflicting local changes require manual review;
 4. merges `/etc/minisoc/signatures-v2.db` by signature ID, preserving custom entries and rejecting conflicting IDs;
 5. creates root-protected backups under `/etc/fail2ban/minisoc-backup-*`;
 6. validates and reloads Fail2Ban, restoring files and attempting to reload the previous configuration if an update fails.
 
 If MiniSOC is not installed, its signature update is skipped. Set `MINISOC_SIGNATURES=/absolute/path` to specify a different database or `MINISOC_REQUIRED=1` to require it. The installer does **not** restart MiniSOC; if its classification engine caches the database, it needs a separate reload.
 
-A safe update cannot automatically resolve all user-modified regexes. On conflict, **do not force an overwrite**: review the local rule and reconcile it with the new upstream filter. The existing `install/uninstall.sh` is not a merge-aware rollback tool; use the automatic update rollback or retained backups instead.
+A safe update cannot automatically resolve all user-modified regexes. On conflict, **do not force an overwrite**: review the local rule and reconcile it with the new upstream filter.
+
+### Inspect or restore a saved backup (upcoming update)
+
+The backup manifest records the original file hashes, ownership and modes. Inspect the selected backup before attempting restoration:
+
+```bash
+sudo python3 install/restore_backup.py /etc/fail2ban/minisoc-backup-YYYYMMDDTHHMMSSZ-PID --dry-run
+```
+
+To restore the specific backup after reviewing its plan, omit `--dry-run`. Restoration refuses to overwrite a file whose contents changed since the backup, and it tests/reloads Fail2Ban with rollback on failure. Run it locally with a console or out-of-band recovery option available. Backup paths under `/etc/fail2ban` are examples; use the exact path printed by the updater.
 
 ## Uninstall
 
 ```bash
+sudo bash ./install/uninstall.sh --dry-run
 sudo bash ./install/uninstall.sh
 ```
 
-The uninstall helper removes only files managed by this project, validates the remaining Fail2Ban configuration, and reloads the service.
+The upcoming fail-closed uninstaller removes only files identical to recognized project baselines or the currently bundled versions. Customized filters, local overrides and modified jail files cause the entire operation to stop for manual review. Before deleting project-owned files it creates a backup, and after removal it validates/reloads Fail2Ban; failure triggers automatic restoration. It intentionally preserves the MiniSOC signature database.
 
 ## Before using in production
 

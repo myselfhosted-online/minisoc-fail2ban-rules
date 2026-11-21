@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Conservative, transactional update of MiniSOC Fail2Ban filters and signature DB.
+"""Fail-closed MiniSOC/Fail2Ban updater: preflight, merge, backup, rollback.
 
-Default behavior preserves unknown/customized files and aborts on ambiguous merges.
-No MiniSOC service restart is attempted; applications may cache the signature DB.
+Requires Python >=3.9, git only for three-way filter merges, and fail2ban-client
+for an actual install. --dry-run is non-mutating; tests use isolated fake clients.
 """
-
 from __future__ import annotations
-
 import argparse
 import fcntl
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -20,281 +20,313 @@ import tempfile
 from datetime import datetime, timezone
 from dataclasses import dataclass
 
-ROOT = Path(__file__).resolve().parent.parent
-FILTERS = ("nginx-skanery.conf", "nginx-dev-honeypot.conf")
-PREVIOUS_VERSIONS = ("v1.2.1", "v1.3.0")
+ROOT = Path(__file__).resolve().parents[1]
+FILTERS = ('nginx-skanery.conf', 'nginx-dev-honeypot.conf')
+VERSIONS = ('v1.2.1', 'v1.3.0', 'v1.3.1')
+RELEASE = 'working-next-release'
 
 class UpdateError(Exception):
     pass
 
 @dataclass
 class Change:
-    path: Path
-    content: bytes
-    description: str
-    expected: bytes | None
+    destination: Path
+    before: bytes | None
+    after: bytes
+    reason: str
+    logical_name: str
 
 
-def read_regular(path: Path) -> bytes | None:
+def regular_file(path: Path) -> bytes | None:
+    """Do not follow a symlink in a privileged target path."""
     if path.is_symlink():
-        raise UpdateError(f"Refusing to modify symlink: {path}")
+        raise UpdateError(f'Refusing symlink: {path}')
     if not path.exists():
         return None
     if not path.is_file():
-        raise UpdateError(f"Refusing non-regular path: {path}")
+        raise UpdateError(f'Refusing non-regular file: {path}')
     return path.read_bytes()
 
 
-def parse_signatures(raw: bytes, source: Path) -> dict[str, str]:
+def no_symlink_parents(path: Path) -> None:
+    for parent in [path, *path.parents]:
+        if parent.is_symlink():
+            raise UpdateError(f'Refusing symlink in destination path: {parent}')
+
+
+def parse_db(content: bytes, path: Path) -> dict[str, str]:
     try:
-        lines = raw.decode("utf-8").splitlines()
+        text = content.decode('utf-8')
     except UnicodeDecodeError as exc:
-        raise UpdateError(f"Signature database is not UTF-8: {source}") from exc
-    found: dict[str, str] = {}
-    for number, line in enumerate(lines, 1):
-        if not line.strip() or line.lstrip().startswith("#"):
+        raise UpdateError(f'Invalid UTF-8 in {path}') from exc
+    entries = {}
+    for idx, line in enumerate(text.splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith('#'):
             continue
-        parts = line.split("|", 3)
-        if len(parts) != 4 or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]*", parts[0]):
-            raise UpdateError(f"Invalid signature at {source}:{number}")
-        ident, severity, category, regex = parts
-        if severity not in {"HIGH", "MEDIUM", "INFO"} or not category or not regex:
-            raise UpdateError(f"Invalid signature fields at {source}:{number}")
+        parts = line.split('|', 3)
+        if len(parts) != 4:
+            raise UpdateError(f'Malformed signature {path}:{idx}')
+        key, severity, category, pattern = parts
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', key):
+            raise UpdateError(f'Invalid signature ID {path}:{idx}')
+        if severity not in {'HIGH', 'MEDIUM', 'INFO'} or not category or not pattern:
+            raise UpdateError(f'Invalid signature fields {path}:{idx}')
         try:
-            re.compile(regex)
+            re.compile(pattern)
         except re.error as exc:
-            raise UpdateError(f"Invalid signature regex at {source}:{number}: {exc}") from exc
-        if ident in found:
-            raise UpdateError(f"Duplicate signature ID {ident} in {source}")
-        found[ident] = line
-    return found
+            raise UpdateError(f'Invalid regex {path}:{idx}: {exc}') from exc
+        if key in entries:
+            raise UpdateError(f'Duplicate signature ID {key} in {path}')
+        entries[key] = line
+    return entries
 
 
-def merge_signatures(old: bytes | None, new: bytes, old_path: Path, incoming_path: Path) -> bytes:
-    incoming = parse_signatures(new, incoming_path)
-    if old is None:
-        return new
-    installed = parse_signatures(old, old_path)
-    conflicting = sorted(k for k in installed.keys() & incoming.keys() if installed[k] != incoming[k])
-    if conflicting:
-        raise UpdateError("MiniSOC signature ID conflicts: " + ", ".join(conflicting) + ". Existing file left untouched.")
-    added = [line for key, line in incoming.items() if key not in installed]
-    if not added:
-        return old
-    suffix = b"" if old.endswith(b"\n") else b"\n"
-    return old + suffix + b"\n# Added from MiniSOC Fail2Ban Rules v1.3.1\n" + ("\n".join(added) + "\n").encode("utf-8")
+def merge_db(previous: bytes | None, incoming: bytes, destination: Path, source: Path) -> bytes:
+    new_entries = parse_db(incoming, source)
+    if previous is None:
+        return incoming
+    old_entries = parse_db(previous, destination)
+    collisions = sorted(k for k in old_entries.keys() & new_entries.keys() if old_entries[k] != new_entries[k])
+    if collisions:
+        raise UpdateError('Signature ID conflicts; no changes made: '+', '.join(collisions))
+    additions = [line for key, line in new_entries.items() if key not in old_entries]
+    if not additions:
+        return previous
+    separator = b'' if previous.endswith(b'\n') else b'\n'
+    return previous + separator + b'\n# Added by MiniSOC future release\n' + ('\n'.join(additions) + '\n').encode('utf-8')
 
 
-def merge_filter(current: bytes | None, new: bytes, filename: str) -> tuple[bytes, str]:
+def filter_merge(current: bytes | None, incoming: bytes, filename: str) -> tuple[bytes, str]:
     if current is None:
-        return new, "new filter"
-    if current == new:
-        return current, "already current"
-    exact_baselines: list[str] = []
-    for version in PREVIOUS_VERSIONS:
-        path = ROOT / "install" / "baselines" / version / filename
-        if not path.is_file():
-            raise UpdateError(f"Missing bundled baseline: {path}")
-        if current == path.read_bytes():
-            exact_baselines.append(version)
-    if exact_baselines:
-        return new, "known upstream filter " + exact_baselines[-1]
-
-    # A three-way merge is attempted only with explicitly supported baselines.
-    # Ambiguous or conflicting merges always fail closed; never discard custom rules.
-    if shutil.which("git") is None:
-        raise UpdateError(f"Customized filter {filename}: git is required for safe three-way merge. No files changed.")
-    # Pick the baseline only when the installed filter still contains its unique
-    # upstream fingerprint. Trying every baseline can silently remove a newer rule.
-    if filename == "nginx-skanery.conf":
-        if b"/\\.git/(?:config|credentials|HEAD|index|packed-refs|info/refs)" in current:
-            versions = ("v1.3.0",)
-        elif b"/\\.git/(?:config|credentials)" in current:
-            versions = ("v1.2.1",)
+        return incoming, 'new filter'
+    if current == incoming:
+        return current, 'already current'
+    known = []
+    for version in VERSIONS:
+        base = ROOT/'install'/'baselines'/version/filename
+        if not base.is_file():
+            raise UpdateError(f'Missing bundled baseline {base}')
+        if current == base.read_bytes():
+            known.append(version)
+    if known:
+        return incoming, f'update known upstream filter ({known[-1]})'
+    # Never attempt to reconcile unknown local files automatically.
+    possible = []
+    for version in VERSIONS:
+        base = (ROOT/'install'/'baselines'/version/filename).read_bytes()
+        if filename == 'nginx-skanery.conf':
+            fp = (b'/\\.git/(?:config|credentials)' if version == 'v1.2.1' else
+                  b'/\\.git/(?:config|credentials|HEAD|index|packed-refs|info/refs)')
+            if fp not in current:
+                continue
         else:
-            raise UpdateError("Unknown customized nginx-skanery filter baseline; manual review required. No files changed.")
-    else:
-        # Identical upstream baseline in v1.2.1 and v1.3.0.
-        versions = ("v1.3.0",)
-    options: list[bytes] = []
-    for version in versions:
-        path = ROOT / "install" / "baselines" / version / filename
-        with tempfile.TemporaryDirectory(prefix="minisoc-merge-") as temp:
-            directory = Path(temp)
-            local = directory / "local"
-            target = directory / "target"
-            local.write_bytes(current)
-            target.write_bytes(new)
-            merged = subprocess.run(
-                ["git", "merge-file", "-p", "--", str(local), str(path), str(target)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            )
-        if merged.returncode == 0:
-            options.append(merged.stdout)
-        elif merged.returncode > 1:
-            raise UpdateError(f"Three-way merge error for {filename}: {merged.stderr.decode(errors='replace').strip()}")
-    unique = list(dict.fromkeys(options))
-    if len(unique) != 1:
-        raise UpdateError(
-            f"Customized filter {filename} has merge conflicts or ambiguous baselines. "
-            "Original kept untouched; merge changes manually before retrying."
-        )
-    return unique[0], "three-way merge of custom filter"
+            if b'/\\.config/aws/credentials' not in current:
+                continue
+        # Same base may occur in multiple releases; deduplicate.
+        if base not in [x[1] for x in possible]:
+            possible.append((version, base))
+    if not possible or shutil.which('git') is None:
+        raise UpdateError(f'Customized {filename}: unknown baseline or git unavailable. Manual review required.')
+    outcomes = []
+    for version, baseline in possible:
+        with tempfile.TemporaryDirectory(prefix='minisoc-merge-') as tmp:
+            paths = [Path(tmp)/x for x in ('local', 'base', 'incoming')]
+            for p, data in zip(paths, (current, baseline, incoming)):
+                p.write_bytes(data)
+            proc = subprocess.run(['git','merge-file','-p','--',*[str(p) for p in paths]],
+                                  stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
+        if proc.returncode == 0:
+            outcomes.append(proc.stdout)
+        elif proc.returncode > 1:
+            raise UpdateError(f'git merge-file failed ({filename}): {proc.stderr.decode(errors="replace")}')
+    if len(set(outcomes)) != 1 or not outcomes:
+        raise UpdateError(f'Customized {filename}: ambiguous or conflicting merge. No files changed.')
+    result = outcomes[0]
+    # A healthy merge must still contain every upstream branch's distinctive indicator.
+    if b'/\\.git/(?:config|credentials|HEAD|index|packed-refs|info/refs)' not in result and filename == 'nginx-skanery.conf':
+        raise UpdateError(f'Merged filter {filename} lost upstream Git indicators; manual review required.')
+    return result, 'non-conflicting three-way merge'
 
 
-def atomic_write(path: Path, content: bytes, old_exists: bool) -> None:
-    parent = path.parent
-    parent.mkdir(parents=True, exist_ok=True)
-    previous_stat = path.stat() if old_exists else None
-    mode = stat.S_IMODE(previous_stat.st_mode) if previous_stat else 0o644
-    fd, name = tempfile.mkstemp(prefix=".minisoc-update-", dir=parent)
+def atomic_write(path: Path, content: bytes, old: bytes | None) -> None:
+    no_symlink_parents(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.stat() if old is not None else None
+    fd, temp = tempfile.mkstemp(prefix='.minisoc-atomic-', dir=str(path.parent))
     try:
-        with os.fdopen(fd, "wb") as handle:
+        with os.fdopen(fd,'wb') as handle:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.chmod(name, mode)
-        if previous_stat:
-            os.chown(name, previous_stat.st_uid, previous_stat.st_gid)
-        os.replace(name, path)
+        os.chmod(temp, stat.S_IMODE(existing.st_mode) if existing else 0o644)
+        if existing and hasattr(os, 'chown'):
+            os.chown(temp, existing.st_uid, existing.st_gid)
+        os.replace(temp, path)
     finally:
-        if os.path.exists(name):
-            os.unlink(name)
+        if os.path.exists(temp):
+            os.unlink(temp)
 
 
-def invoke_fail2ban(*args: str) -> None:
+def f2b(*args: str) -> None:
     try:
-        subprocess.run(["fail2ban-client", *args], check=True)
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise UpdateError(f"fail2ban-client {' '.join(args)} failed: {exc}") from exc
+        subprocess.run(['fail2ban-client',*args],check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    except (OSError,subprocess.CalledProcessError) as exc:
+        raise UpdateError(f'Fail2Ban {" ".join(args)} failed: {exc}') from exc
 
 
-def run(dry_run: bool = False) -> None:
-    if not dry_run and os.geteuid() != 0:
-        raise UpdateError("Run as root with sudo, or use --dry-run to inspect changes")
-    f2b = Path(os.environ.get("F2B_ETC", "/etc/fail2ban"))
-    mini_db = Path(os.environ.get("MINISOC_SIGNATURES", "/etc/minisoc/signatures-v2.db"))
-    nginx_log = os.environ.get("NGINX_LOG")
-    if not f2b.is_absolute() or not mini_db.is_absolute():
-        raise UpdateError("F2B_ETC and MINISOC_SIGNATURES must be absolute paths")
-    if nginx_log is not None and ("\n" in nginx_log or "\r" in nginx_log):
-        raise UpdateError("NGINX_LOG must not contain newline characters")
+def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: bool) -> list[Change]:
+    changes=[]
+    for name in FILTERS:
+        destination = f2b_etc/'filter.d'/name
+        no_symlink_parents(destination)
+        current=regular_file(destination)
+        incoming=(ROOT/'fail2ban'/'filter.d'/name).read_bytes()
+        content, reason=filter_merge(current,incoming,name)
+        override=f2b_etc/'filter.d'/name.replace('.conf','.local')
+        if override.exists() or override.is_symlink():
+            raise UpdateError(f'Local override {override} detected; review effective rules first')
+        if content != current:
+            changes.append(Change(destination,current,content,reason,'filter.d/'+name))
 
-    incoming_db = ROOT / "rules" / "signatures-v2.db"
-    if not incoming_db.is_file():
-        raise UpdateError(f"Packaged signature database missing: {incoming_db}")
-    planned: list[Change] = []
-    for filename in FILTERS:
-        dest = f2b / "filter.d" / filename
-        current = read_regular(dest)
-        incoming = (ROOT / "fail2ban" / "filter.d" / filename).read_bytes()
-        output, description = merge_filter(current, incoming, filename)
-        if output != current:
-            planned.append(Change(dest, output, description, current))
-        else:
-            print(f"UNCHANGED {dest}")
-        local_overlay = f2b / "filter.d" / filename.replace(".conf", ".local")
-        if local_overlay.exists() or local_overlay.is_symlink():
-            # A .local override can mask these .conf updates. Require explicit review.
-            raise UpdateError(f"Local Fail2Ban override {local_overlay} detected. Review effective rules first; nothing changed.")
-
-    jail = f2b / "jail.d" / "minisoc-fail2ban.local"
-    if read_regular(jail) is None:
-        content = (ROOT / "fail2ban" / "jail.d" / "minisoc-fail2ban.local.example").read_bytes()
+    jail=f2b_etc/'jail.d'/'minisoc-fail2ban.local'
+    no_symlink_parents(jail)
+    old_jail=regular_file(jail)
+    if old_jail is None:
+        content=(ROOT/'fail2ban'/'jail.d'/'minisoc-fail2ban.local.example').read_bytes()
         if nginx_log is not None:
-            if not nginx_log.startswith("/"):
-                raise UpdateError("NGINX_LOG must be an absolute path")
-            content = re.sub(rb"(?m)^logpath = .*", lambda _: b"logpath = " + nginx_log.encode(), content)
-        planned.append(Change(jail, content, "new default jail (no previous jail found)", None))
+            if not nginx_log.startswith('/') or '\r' in nginx_log or '\n' in nginx_log:
+                raise UpdateError('NGINX_LOG must be an absolute path without newlines')
+            content=re.sub(rb'(?m)^logpath = .*$',lambda _:b'logpath = '+nginx_log.encode(),content)
+        changes.append(Change(jail,None,content,'new default jail','jail.d/minisoc-fail2ban.local'))
     else:
-        print(f"PRESERVED {jail} (custom jail settings)")
-        if nginx_log is not None:
-            print("WARNING: NGINX_LOG ignored because jail configuration already exists")
+        print(f'PRESERVED {jail} (jail settings unchanged)')
+        if nginx_log:
+            print('WARNING: NGINX_LOG ignored: the existing jail was preserved')
 
-    current_db = read_regular(mini_db)
-    if current_db is not None or mini_db.parent.is_dir():
-        incoming = incoming_db.read_bytes()
-        output = merge_signatures(current_db, incoming, mini_db, incoming_db)
-        if output != current_db:
-            planned.append(Change(mini_db, output, "merge signature IDs; retain custom signatures", current_db))
-        else:
-            print(f"UNCHANGED {mini_db}")
+    no_symlink_parents(db)
+    old_db=regular_file(db)
+    if old_db is not None or db.parent.is_dir():
+        source=ROOT/'rules'/'signatures-v2.db'
+        incoming=source.read_bytes()
+        content=merge_db(old_db,incoming,db,source)
+        if content != old_db:
+            changes.append(Change(db,old_db,content,'add new signature IDs; preserve local rules','minisoc/signatures-v2.db'))
+    elif require_minisoc:
+        raise UpdateError(f'MiniSOC signature directory missing: {db.parent}')
     else:
-        if os.environ.get("MINISOC_REQUIRED") == "1":
-            raise UpdateError(f"MiniSOC signature directory missing: {mini_db.parent}")
-        print(f"SKIPPED {mini_db} (MiniSOC directory missing; rule-only install)")
+        print(f'SKIPPED {db} (MiniSOC directory absent; standalone Fail2Ban installation)')
+    return changes
 
-    for change in planned:
-        print(f"{'WOULD UPDATE' if dry_run else 'UPDATE'} {change.path}: {change.description}")
-    if dry_run:
-        print("DRY RUN: no files changed; no services reloaded")
-        return
-    if not shutil.which("fail2ban-client"):
-        raise UpdateError("fail2ban-client command not found")
-    if not planned:
-        print("Already up to date; no reload needed")
-        return
 
-    # Fail before touching files if the running installation is already invalid.
-    invoke_fail2ban("-t")
-    f2b.mkdir(parents=True, exist_ok=True)
-    lock = f2b / ".minisoc-update.lock"
-    with lock.open("a+b") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        backup = f2b / ("minisoc-backup-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{os.getpid()}")
-        backup.mkdir(mode=0o700)
-        old_data: dict[Path, bytes | None] = {}
-        modified: list[Path] = []
+def digest(raw: bytes | None) -> str | None:
+    return hashlib.sha256(raw).hexdigest() if raw is not None else None
+
+
+def backup_changes(changes: list[Change], backup: Path) -> None:
+    # Manifest is stored inside a restricted directory, along with path-preserving copies.
+    backup.mkdir(mode=0o700)
+    records=[]
+    for i,item in enumerate(changes):
+        record={'path':str(item.destination),'logical_name':item.logical_name,
+                'action':'delete' if item.reason.startswith('uninstall') else 'write',
+                'was_present':item.before is not None,'sha256_before':digest(item.before),
+                'sha256_after':None if item.reason.startswith('uninstall') else digest(item.after)}
+        if item.before is not None:
+            name=f'{i:02d}.orig'
+            target=backup/name
+            original_stat=item.destination.stat()
+            shutil.copy2(item.destination,target,follow_symlinks=False)
+            record['backup_file']=name
+            record['mode_before']=stat.S_IMODE(original_stat.st_mode)
+            record['uid_before']=original_stat.st_uid
+            record['gid_before']=original_stat.st_gid
+        records.append(record)
+    manifest=backup/'manifest.json'
+    manifest.write_text(json.dumps({'schema':1,'release':RELEASE,'changes':records},indent=2)+'\n')
+    manifest.chmod(0o600)
+    with manifest.open('rb') as f:
+        os.fsync(f.fileno())
+
+
+def restore(changes: list[Change]) -> list[str]:
+    errors=[]
+    for item in reversed(changes):
         try:
-            # Concurrent changes since preflight are treated as a conflict.
-            for change in planned:
-                if read_regular(change.path) != change.expected:
-                    raise UpdateError(f"File changed since preflight: {change.path}")
-            for i, change in enumerate(planned):
-                old = read_regular(change.path)
-                old_data[change.path] = old
-                if old is not None:
-                    backup_file = backup / (f"{i:02d}-" + change.path.name)
-                    shutil.copy2(change.path, backup_file)
-                atomic_write(change.path, change.content, old_exists=old is not None)
-                modified.append(change.path)
-            invoke_fail2ban("-t")
-            invoke_fail2ban("reload")
+            # Restoration from the captured preflight bytes is independent of backup naming.
+            if item.before is None:
+                item.destination.unlink(missing_ok=True)
+            else:
+                atomic_write(item.destination,item.before,item.after)
+        except Exception as exc:
+            errors.append(f'{item.destination}: {exc}')
+    return errors
+
+
+def run(dry_run: bool=False) -> None:
+    if not dry_run and os.geteuid()!=0:
+        raise UpdateError('Root privileges required; use sudo or --dry-run')
+    base=Path(os.environ.get('F2B_ETC','/etc/fail2ban'))
+    db=Path(os.environ.get('MINISOC_SIGNATURES','/etc/minisoc/signatures-v2.db'))
+    if not base.is_absolute() or not db.is_absolute():
+        raise UpdateError('F2B_ETC and MINISOC_SIGNATURES must be absolute paths')
+    changes=targets(base,db,os.environ.get('NGINX_LOG'),os.environ.get('MINISOC_REQUIRED')=='1')
+    for item in changes:
+        print(f'{"WOULD UPDATE" if dry_run else "PLAN"} {item.destination}: {item.reason}')
+    if dry_run:
+        print('DRY RUN: no file modifications, reload or lock creation')
+        return
+    if not shutil.which('fail2ban-client'):
+        raise UpdateError('fail2ban-client not found')
+    if not changes:
+        print('Already up to date; no changes necessary')
+        return
+    f2b('-t')
+    base.mkdir(parents=True,exist_ok=True)
+    lock=base/'.minisoc-update.lock'
+    no_symlink_parents(lock)
+    with lock.open('a+b') as fd:
+        fcntl.flock(fd,fcntl.LOCK_EX)
+        # Preflight + lock re-check; external editors do not use this lock, so fail closed.
+        for item in changes:
+            if regular_file(item.destination)!=item.before:
+                raise UpdateError(f'File changed during preflight: {item.destination}')
+        backup=base/('minisoc-backup-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+f'-{os.getpid()}')
+        try:
+            backup_changes(changes,backup)
+        except Exception as exc:
+            raise UpdateError(f'Could not complete backup: {exc}') from exc
+        changed=[]
+        try:
+            for item in changes:
+                # Register *before* write so any partial error after replacement is rolled back.
+                changed.append(item)
+                atomic_write(item.destination,item.after,item.before)
+            f2b('-t')
+            f2b('reload')
         except BaseException as exc:
-            print(f"UPDATE FAILED: {exc}", file=sys.stderr)
-            errors = []
-            for path in reversed(modified):
-                try:
-                    old = old_data[path]
-                    if old is None:
-                        path.unlink(missing_ok=True)
-                    else:
-                        atomic_write(path, old, old_exists=True)
-                except Exception as rollback_exc:
-                    errors.append(f"{path}: {rollback_exc}")
+            errors=restore(changed)
             try:
-                invoke_fail2ban("reload")
-            except Exception as rollback_exc:
-                errors.append(f"Fail2Ban reload of restored rules: {rollback_exc}")
+                f2b('-t')
+                f2b('reload')
+            except Exception as reload_exc:
+                errors.append(f'Reload of restored configuration failed: {reload_exc}')
             if errors:
-                raise UpdateError("Rollback incomplete: " + "; ".join(errors)) from exc
-            raise UpdateError(f"Configuration restored automatically. Backup: {backup}") from exc
-        print(f"SUCCESS: update applied. Backup: {backup}")
-        print("NOTE: MiniSOC application may need its own signature-cache reload; no MiniSOC service was restarted.")
+                raise UpdateError('UPDATE FAILED; rollback INCOMPLETE: '+'; '.join(errors)+f'. Backup: {backup}') from exc
+            raise UpdateError(f'UPDATE FAILED; previous files restored automatically. Backup: {backup}; cause: {exc}') from exc
+        print(f'SUCCESS; backup available at {backup}')
+        print('NOTICE: MiniSOC application is not restarted. Reload its signature cache separately if necessary.')
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Safely update Fail2Ban filters and MiniSOC signatures")
-    parser.add_argument("--dry-run", action="store_true", help="show planned changes without writing or reloading")
-    options = parser.parse_args()
+    parser=argparse.ArgumentParser(description='Safe update of Fail2Ban and MiniSOC rules')
+    parser.add_argument('--dry-run',action='store_true',help='preview only, no mutations')
+    args=parser.parse_args()
     try:
-        run(options.dry_run)
-    except (UpdateError, OSError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        run(args.dry_run)
+    except (OSError,UpdateError) as exc:
+        print('ERROR:',exc,file=sys.stderr)
         return 1
     return 0
 
-if __name__ == "__main__":
+if __name__=='__main__':
     raise SystemExit(main())

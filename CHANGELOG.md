@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — v1.3.2 candidate
+
+- Add narrowly scoped rules for encoded environment-file traversal, root SQL backup discovery, sensitive service-account and Streamlit paths; preserve broad discovery patterns as review-only candidates.
+- Harden the update path with a v1.3.1 baseline, conflict checks, backups, and automated rollback on validation or reload failure.
+- Introduce a fail-closed uninstaller and a SHA-256-verified manual backup restoration tool. Customized filters and jail files are never silently removed.
+- Add deduplicated incident diagnostics distinguishing jail notifications, individual requests, distinct paths, and short-window HTTP status transitions.
+- Expand sanitized November 2026 test fixtures and offline regression coverage.
+- Require a real Fail2Ban parser in both validation and release workflows; unit-test success alone does not certify regex integration.
+
 ## 1.3.1 — 2026-11-15
 
 Maintenance and bug-fix release focused on upgrade safety.

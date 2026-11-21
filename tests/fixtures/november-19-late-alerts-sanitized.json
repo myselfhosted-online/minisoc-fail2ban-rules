@@ -1,0 +1,128 @@
+[
+  {
+    "ip": "198.51.100.27",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-19T16:46:39+01:00",
+        "path": "/wp-content/plugins/hellopress/wp_filemanager.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T16:46:40+01:00",
+        "path": "/wp-xserver.php?p=",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T16:46:41+01:00",
+        "path": "/wp-content/uploads/",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T16:46:41+01:00",
+        "path": "//wp-includes/l10n/",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T16:46:41+01:00",
+        "path": "/wp-load.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T16:46:41+01:00",
+        "path": "/wp-admin/css/colors/modern/",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.28",
+    "jail": "nginx-dev-honeypot",
+    "events": [
+      {
+        "time": "2026-11-19T19:39:51+01:00",
+        "path": "/site.zip",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:53+01:00",
+        "path": "/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:53+01:00",
+        "path": "/dev/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:53+01:00",
+        "path": "/backend/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:54+01:00",
+        "path": "/sendgrid.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:54+01:00",
+        "path": "/laravel/.env",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.28",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-19T19:39:51+01:00",
+        "path": "/site.zip",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:53+01:00",
+        "path": "/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:53+01:00",
+        "path": "/dev/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:53+01:00",
+        "path": "/backend/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:54+01:00",
+        "path": "/sendgrid.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-19T19:39:54+01:00",
+        "path": "/laravel/.env",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  }
+]

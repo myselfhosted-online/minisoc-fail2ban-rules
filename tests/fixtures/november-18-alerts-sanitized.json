@@ -1,0 +1,170 @@
+[
+  {
+    "ip": "198.51.100.18",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T02:20:22+01:00",
+        "path": "/wp-content/plugins/hellopress/wp_filemanager.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:20:24+01:00",
+        "path": "/wp-includes/js/tinymce/index.php?p=",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:20:24+01:00",
+        "path": "/wp-filemannger.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:20:25+01:00",
+        "path": "/wp-gans.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:20:25+01:00",
+        "path": "/wp-admin/css/about.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:20:25+01:00",
+        "path": "/wp-admin/maint/wp-login.php",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.19",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T02:30:12+01:00",
+        "path": "/wp-login.php",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:30:19+01:00",
+        "path": "/backend/.env",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:30:19+01:00",
+        "path": "/backend/%2eenv",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:30:19+01:00",
+        "path": "/backend/%252eenv",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:30:24+01:00",
+        "path": "/backend/.%65nv",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T02:30:25+01:00",
+        "path": "/backend/./.env",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.20",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-18T04:23:58+01:00",
+        "path": "/.circleci/config.yml",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/database.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/backup.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/dump.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/api/v1/namespaces/default/secrets",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/.env.production.backup",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "198.51.100.20",
+    "jail": "nginx-dev-honeypot",
+    "events": [
+      {
+        "time": "2026-11-18T04:23:58+01:00",
+        "path": "/.circleci/config.yml",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/database.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/backup.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/dump.sql",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/api/v1/namespaces/default/secrets",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-18T04:23:59+01:00",
+        "path": "/.env.production.backup",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  }
+]

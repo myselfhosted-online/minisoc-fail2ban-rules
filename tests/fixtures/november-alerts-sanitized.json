@@ -1,0 +1,212 @@
+[
+  {
+    "ip": "203.0.113.10",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-15T19:46:35+01:00",
+        "path": "/uploads../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:35+01:00",
+        "path": "/img../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:35+01:00",
+        "path": "/api/uploads/%2e%2e%2f%2e%2e%2f.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:35+01:00",
+        "path": "/public../.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:35+01:00",
+        "path": "/settings%2F.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:35+01:00",
+        "path": "/images../.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "203.0.113.10",
+    "jail": "nginx-highconf",
+    "events": [
+      {
+        "time": "2026-11-15T19:46:36+01:00",
+        "path": "/.github/workflows/release.yml",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:36+01:00",
+        "path": "/configuration.js",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:36+01:00",
+        "path": "/web/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:36+01:00",
+        "path": "/flowise/api/v1/credentials",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:36+01:00",
+        "path": "/.git/config",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:36+01:00",
+        "path": "/frontend/.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "203.0.113.10",
+    "jail": "nginx-fake-searchbots",
+    "events": [
+      {
+        "time": "2026-11-15T19:46:39+01:00",
+        "path": "/firebaseConfig.js",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:39+01:00",
+        "path": "/var/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:39+01:00",
+        "path": "/tmp/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:39+01:00",
+        "path": "/terraform.tfstate.backup",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:39+01:00",
+        "path": "/temp/.env",
+        "status": 401,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-15T19:46:39+01:00",
+        "path": "/env/.env",
+        "status": 401,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "203.0.113.11",
+    "jail": "nginx-skanery",
+    "events": [
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/config.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/config/config.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/config.yaml",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/client_secrets.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/credentials.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/credentials.yml",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "ip": "203.0.113.11",
+    "jail": "nginx-dev-honeypot",
+    "events": [
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/config.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/config/config.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/config.yaml",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/client_secrets.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/credentials.json",
+        "status": 404,
+        "method": "GET"
+      },
+      {
+        "time": "2026-11-16T05:06:24+01:00",
+        "path": "/credentials.yml",
+        "status": 404,
+        "method": "GET"
+      }
+    ]
+  }
+]

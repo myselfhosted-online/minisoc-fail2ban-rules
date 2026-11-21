@@ -1,15 +1,20 @@
 name: Validate rules
-
 on:
   push:
   pull_request:
-
+permissions:
+  contents: read
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate repository
+      - name: Install real Fail2Ban parser for integration tests
         run: |
-          chmod +x scripts/validate.sh
-          ./scripts/validate.sh
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban
+      - name: Validate repository, updater rollback and regexes
+        env:
+          REQUIRE_FAIL2BAN_REGEX: '1'
+        run: |
+          bash ./scripts/validate.sh

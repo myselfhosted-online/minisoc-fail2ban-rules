@@ -75,6 +75,18 @@ The update preserves existing jail settings, supports conservative merges of kno
 
 See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.1 release notes](docs/releases/v1.3.1.md).
 
+### Upcoming maintenance update (unreleased)
+
+The unreleased development candidate contains additional, conservative detection signatures, an audited uninstaller and a manual backup restoration utility. For updates using that code, run `--dry-run` first and inspect the plan, especially when local Fail2Ban filters or MiniSOC signature IDs have been customized.
+
+For an already-created MiniSOC backup, first inspect it without making changes:
+
+```bash
+sudo python3 install/restore_backup.py /etc/fail2ban/minisoc-backup-YYYYMMDDTHHMMSSZ-PID --dry-run
+```
+
+The restore command verifies its manifest, original hashes, and expected installed-file state before making any changes. See [the Fail2Ban operating guide](docs/FAIL2BAN.md) and [the draft maintenance notes](docs/releases/v1.3.2-DRAFT.md). A GitHub commit on a development branch is not a release or a production deployment.
+
 ## Using these rules with Fail2Ban
 
 For the full installation, verification, troubleshooting, update, unban, and uninstall procedure, see **[docs/FAIL2BAN.md](docs/FAIL2BAN.md)**.
