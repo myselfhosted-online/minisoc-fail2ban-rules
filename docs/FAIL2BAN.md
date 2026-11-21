@@ -216,7 +216,7 @@ The updater:
 
 1. checks for local filter overrides and unknown versions before modifying files;
 2. preserves existing jail settings such as `bantime`, `maxretry`, and `logpath`;
-3. merges filters conservatively against bundled v1.2.1/v1.3.0/v1.3.1 baselines; conflicting local changes require manual review;
+3. merges filters conservatively against bundled v1.2.1/v1.3.0/v1.3.1/v1.3.2 baselines; conflicting local changes require manual review;
 4. merges `/etc/minisoc/signatures-v2.db` by signature ID, preserving custom entries and rejecting conflicting IDs;
 5. creates root-protected backups under `/etc/fail2ban/minisoc-backup-*`;
 6. validates and reloads Fail2Ban, restoring files and attempting to reload the previous configuration if an update fails.
@@ -224,6 +224,22 @@ The updater:
 If MiniSOC is not installed, its signature update is skipped. Set `MINISOC_SIGNATURES=/absolute/path` to specify a different database or `MINISOC_REQUIRED=1` to require it. The installer does **not** restart MiniSOC; if its classification engine caches the database, it needs a separate reload.
 
 A safe update cannot automatically resolve all user-modified regexes. On conflict, **do not force an overwrite**: review the local rule and reconcile it with the new upstream filter.
+
+### Customized filter compatibility (v1.3.3)
+
+Version 1.3.2 incorrectly required an exact `.git` regex fragment to recognize modified filters, even though equivalent custom regex spellings are legitimate. Version 1.3.3 tries verified three-way merges without that fingerprint, but it never guesses a baseline when local modifications conflict with the upstream regex. It also recognizes an exact v1.3.2 filter as a known source.
+
+For unrecognized custom filters, `--dry-run` reports `WARNING PRESERVED` and explicitly warns that the latest bundled filter rules would **not** be activated. No live file changes occur. A normal installation fails closed until an operator chooses one of two paths:
+
+1. Manually review and merge the custom filter with the new upstream regex, test it using `fail2ban-regex` and `fail2ban-client -t`, and continue managing that custom filter separately (future installer runs may still require the explicit preservation flag); or
+2. Explicitly allow a **partial** update, preserving the custom filter byte-for-byte while updating only other managed components:
+
+```bash
+sudo bash ./install/install.sh --dry-run --preserve-custom-filters
+sudo bash ./install/install.sh --preserve-custom-filters
+```
+
+The second option does **not** install the latest bundled filter rules into any preserved custom filter. Backup and automatic rollback cover only the files listed in the update plan. Existing jail settings and filters are never silently replaced.
 
 ### Inspect or restore a saved backup (v1.3.2)
 

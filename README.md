@@ -73,7 +73,26 @@ sudo bash ./install/install.sh
 
 The update preserves existing jail settings, supports conservative merges of known previous filter versions, and merges MiniSOC signatures by ID. Conflicts stop the upgrade without overwriting custom rules. Backups are created before applying changes. The MiniSOC application itself is not restarted.
 
-See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.2 release notes](docs/releases/v1.3.2.md).
+See [docs/FAIL2BAN.md](docs/FAIL2BAN.md) and [v1.3.3 release notes](docs/releases/v1.3.3.md).
+
+### Fix for customized filters in v1.3.3
+
+The v1.3.2 updater could mistake a customized but valid filter for an unsupported version because it required one literal `.git` regex spelling. Version 1.3.3 removes this fingerprint test. It attempts only conflict-free, unambiguous three-way merges against known upstream baselines, and **never** silently replaces an unrelated operator-maintained filter.
+
+Preview the real outcome first:
+
+```bash
+sudo bash ./install/install.sh --dry-run
+```
+
+If the output says `WARNING PRESERVED`, the local filter is incompatible with an automatic merge. An ordinary installation will still stop before modifying files. To explicitly update other project-managed components while leaving the customized filter intact:
+
+```bash
+sudo bash ./install/install.sh --dry-run --preserve-custom-filters
+sudo bash ./install/install.sh --preserve-custom-filters
+```
+
+**This is a partial update:** bundled v1.3.3 filter changes are *not* installed into a preserved custom filter. Review and migrate that filter separately; do not bypass the safeguard with a forced overwrite. Backups and rollback apply to files actually changed by the updater.
 
 ### Maintenance update in v1.3.2
 

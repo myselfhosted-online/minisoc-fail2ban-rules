@@ -88,7 +88,7 @@ class Patches(unittest.TestCase):
     def test_unknown_local_filter_is_not_overwritten(self):
         path=self.etc/'filter.d'/'nginx-skanery.conf';path.parent.mkdir()
         path.write_text('[Definition]\nfailregex = danger\n')
-        with self.assertRaisesRegex(update.UpdateError,'unknown baseline'):
+        with self.assertRaisesRegex(update.UpdateError,'Customized filters require manual review'):
             update.run()
         self.assertEqual(path.read_text(),'[Definition]\nfailregex = danger\n')
 

@@ -47,10 +47,10 @@ exit 0
         self.patch_uid.start()
         self.addCleanup(self.patch_uid.stop)
 
-    def execute(self, dry_run=False):
+    def execute(self, dry_run=False, preserve_custom_filters=False):
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-            module.run(dry_run)
+            module.run(dry_run, preserve_custom_filters)
         return output.getvalue()
 
     def create_installed_filter(self, version="v1.3.0", filename="nginx-skanery.conf", suffix=b""):
@@ -87,6 +87,63 @@ exit 0
         filter_path = self.create_installed_filter(suffix=b"\n# Custom security note\n")
         self.execute()
         self.assertIn("# Custom security note", filter_path.read_text())
+
+    def test_version_132_baseline_is_recognized(self):
+        filter_path = self.create_installed_filter(version="v1.3.2")
+        self.execute()
+        self.assertEqual(filter_path.read_bytes(), (ROOT / "fail2ban/filter.d/nginx-skanery.conf").read_bytes())
+
+    def test_git_not_required_for_exact_known_baseline(self):
+        original = (ROOT / 'install/baselines/v1.3.2/nginx-skanery.conf').read_bytes()
+        incoming = (ROOT / 'fail2ban/filter.d/nginx-skanery.conf').read_bytes()
+        with patch.object(module.shutil, 'which', return_value=None):
+            result, reason = module.filter_merge(original, incoming, 'nginx-skanery.conf')
+        self.assertEqual(result, incoming)
+        self.assertIn('already current', reason)
+
+    def test_user_style_custom_regex_preserved_and_dry_run_reports_blocker(self):
+        # Reproduces the Debian report without publishing the private filter.
+        # The user's regex uses (config|HEAD), not the upstream (?:config|...) spelling.
+        custom = (b'[Definition]\n'
+                  b'failregex = ^<HOST> .*"(?:GET|POST) [^\"]*(?:/\\.git/(config|HEAD)|/\\.env) '
+                  b'HTTP/[0-9.]+" (?:401|404)\\b\n'
+                  b'ignoreregex =\n')
+        installed = self.f2b / 'filter.d' / 'nginx-skanery.conf'
+        installed.parent.mkdir(parents=True)
+        installed.write_bytes(custom)
+        dry_run = self.execute(dry_run=True)
+        self.assertIn('WARNING PRESERVED', dry_run)
+        self.assertIn('REQUIRES REVIEW', dry_run)
+        self.assertIn('bundled v1.3.3 filter rules NOT activated', dry_run)
+        with self.assertRaisesRegex(module.UpdateError, '--preserve-custom-filters'):
+            self.execute()
+        self.assertEqual(installed.read_bytes(), custom)
+        self.assertFalse(self.log.exists())
+        self.assertFalse((self.f2b / 'jail.d').exists())
+
+        result = self.execute(preserve_custom_filters=True)
+        self.assertIn('PARTIAL UPDATE', result)
+        self.assertEqual(installed.read_bytes(), custom)
+        self.assertEqual((self.f2b / 'filter.d' / 'nginx-dev-honeypot.conf').read_bytes(),
+                         (ROOT / 'fail2ban/filter.d/nginx-dev-honeypot.conf').read_bytes())
+        self.assertIn('reload', self.log.read_text())
+        manifests = list(self.f2b.glob('minisoc-backup-*/manifest.json'))
+        self.assertEqual(len(manifests), 1)
+        changed_paths = [row['path'] for row in __import__('json').loads(manifests[0].read_text())['changes']]
+        self.assertNotIn(str(installed), changed_paths)
+
+    def test_partial_update_rollback_does_not_touch_custom_filter(self):
+        custom = b'[Definition]\nfailregex = ^<HOST> .*unexpected-private-scanner HTTP/1\\.1\n'
+        installed = self.f2b / 'filter.d' / 'nginx-skanery.conf'
+        installed.parent.mkdir(parents=True)
+        installed.write_bytes(custom)
+        os.environ['FAKE_FAIL_ON_TEST'] = '2'
+        self.addCleanup(os.environ.pop, 'FAKE_FAIL_ON_TEST', None)
+        with self.assertRaisesRegex(module.UpdateError, 'restored automatically'):
+            self.execute(preserve_custom_filters=True)
+        self.assertEqual(installed.read_bytes(), custom)
+        self.assertFalse((self.f2b / 'filter.d' / 'nginx-dev-honeypot.conf').exists())
+        self.assertFalse(self.db.exists())
 
     def test_conflicting_filter_aborts_without_writes(self):
         filter_path = self.create_installed_filter("v1.2.1")

@@ -22,8 +22,8 @@ from dataclasses import dataclass
 
 ROOT = Path(__file__).resolve().parents[1]
 FILTERS = ('nginx-skanery.conf', 'nginx-dev-honeypot.conf')
-VERSIONS = ('v1.2.1', 'v1.3.0', 'v1.3.1')
-RELEASE = 'v1.3.2'
+VERSIONS = ('v1.2.1', 'v1.3.0', 'v1.3.1', 'v1.3.2')
+RELEASE = 'v1.3.3'
 
 class UpdateError(Exception):
     pass
@@ -93,7 +93,7 @@ def merge_db(previous: bytes | None, incoming: bytes, destination: Path, source:
     if not additions:
         return previous
     separator = b'' if previous.endswith(b'\n') else b'\n'
-    return previous + separator + b'\n# Added by MiniSOC v1.3.2\n' + ('\n'.join(additions) + '\n').encode('utf-8')
+    return previous + separator + f'\n# Added by MiniSOC {RELEASE}\n'.encode() + ('\n'.join(additions) + '\n').encode('utf-8')
 
 
 def filter_merge(current: bytes | None, incoming: bytes, filename: str) -> tuple[bytes, str]:
@@ -110,23 +110,27 @@ def filter_merge(current: bytes | None, incoming: bytes, filename: str) -> tuple
             known.append(version)
     if known:
         return incoming, f'update known upstream filter ({known[-1]})'
-    # Never attempt to reconcile unknown local files automatically.
+    # The v1.3.2 updater relied on one literal .git regex spelling as a
+    # fingerprint. Local filters using equivalent syntax were never considered
+    # for merging. Try every authentic bundled baseline instead; never guess
+    # which arbitrary local regex should be replaced.
+    if shutil.which('git') is None:
+        return current, 'preserved customized filter (git unavailable for three-way merge)'
+
     possible = []
+    seen = set()
     for version in VERSIONS:
         base = (ROOT/'install'/'baselines'/version/filename).read_bytes()
-        if filename == 'nginx-skanery.conf':
-            fp = (b'/\\.git/(?:config|credentials)' if version == 'v1.2.1' else
-                  b'/\\.git/(?:config|credentials|HEAD|index|packed-refs|info/refs)')
-            if fp not in current:
-                continue
-        else:
-            if b'/\\.config/aws/credentials' not in current:
-                continue
-        # Same base may occur in multiple releases; deduplicate.
-        if base not in [x[1] for x in possible]:
+        if base not in seen:
             possible.append((version, base))
-    if not possible or shutil.which('git') is None:
-        raise UpdateError(f'Customized {filename}: unknown baseline or git unavailable. Manual review required.')
+            seen.add(base)
+
+    # For an automatic upgrade, the new upstream failregex must survive
+    # verbatim. A conflict-free merge alone does not prove that an unrelated
+    # locally maintained filter is compatible with this project's rules.
+    upstream_regexes = [line for line in incoming.splitlines() if line.startswith(b'failregex =')]
+    if len(upstream_regexes) != 1:
+        raise UpdateError(f'Invalid upstream failregex in {filename}')
     outcomes = []
     for version, baseline in possible:
         with tempfile.TemporaryDirectory(prefix='minisoc-merge-') as tmp:
@@ -135,16 +139,13 @@ def filter_merge(current: bytes | None, incoming: bytes, filename: str) -> tuple
                 p.write_bytes(data)
             proc = subprocess.run(['git','merge-file','-p','--',*[str(p) for p in paths]],
                                   stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
-        if proc.returncode == 0:
+        if proc.returncode == 0 and upstream_regexes[0] in proc.stdout:
             outcomes.append(proc.stdout)
         elif proc.returncode > 1:
             raise UpdateError(f'git merge-file failed ({filename}): {proc.stderr.decode(errors="replace")}')
     if len(set(outcomes)) != 1 or not outcomes:
-        raise UpdateError(f'Customized {filename}: ambiguous or conflicting merge. No files changed.')
+        return current, 'preserved customized filter (unknown baseline or conflicting merge)'
     result = outcomes[0]
-    # A healthy merge must still contain every upstream branch's distinctive indicator.
-    if b'/\\.git/(?:config|credentials|HEAD|index|packed-refs|info/refs)' not in result and filename == 'nginx-skanery.conf':
-        raise UpdateError(f'Merged filter {filename} lost upstream Git indicators; manual review required.')
     return result, 'non-conflicting three-way merge'
 
 
@@ -174,8 +175,9 @@ def f2b(*args: str) -> None:
         raise UpdateError(f'Fail2Ban {" ".join(args)} failed: {exc}') from exc
 
 
-def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: bool) -> list[Change]:
+def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: bool) -> tuple[list[Change], list[Path]]:
     changes=[]
+    preserved=[]
     for name in FILTERS:
         destination = f2b_etc/'filter.d'/name
         no_symlink_parents(destination)
@@ -185,6 +187,9 @@ def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: boo
         override=f2b_etc/'filter.d'/name.replace('.conf','.local')
         if override.exists() or override.is_symlink():
             raise UpdateError(f'Local override {override} detected; review effective rules first')
+        if reason.startswith('preserved customized filter'):
+            preserved.append(destination)
+            print(f'WARNING PRESERVED {destination}: {reason}; bundled {RELEASE} filter rules NOT activated')
         if content != current:
             changes.append(Change(destination,current,content,reason,'filter.d/'+name))
 
@@ -215,7 +220,7 @@ def targets(f2b_etc: Path, db: Path, nginx_log: str | None, require_minisoc: boo
         raise UpdateError(f'MiniSOC signature directory missing: {db.parent}')
     else:
         print(f'SKIPPED {db} (MiniSOC directory absent; standalone Fail2Ban installation)')
-    return changes
+    return changes,preserved
 
 
 def digest(raw: bytes | None) -> str | None:
@@ -262,23 +267,32 @@ def restore(changes: list[Change]) -> list[str]:
     return errors
 
 
-def run(dry_run: bool=False) -> None:
+def run(dry_run: bool=False, preserve_custom_filters: bool=False) -> None:
     if not dry_run and os.geteuid()!=0:
         raise UpdateError('Root privileges required; use sudo or --dry-run')
     base=Path(os.environ.get('F2B_ETC','/etc/fail2ban'))
     db=Path(os.environ.get('MINISOC_SIGNATURES','/etc/minisoc/signatures-v2.db'))
     if not base.is_absolute() or not db.is_absolute():
         raise UpdateError('F2B_ETC and MINISOC_SIGNATURES must be absolute paths')
-    changes=targets(base,db,os.environ.get('NGINX_LOG'),os.environ.get('MINISOC_REQUIRED')=='1')
+    changes,preserved=targets(base,db,os.environ.get('NGINX_LOG'),os.environ.get('MINISOC_REQUIRED')=='1')
     for item in changes:
         print(f'{"WOULD UPDATE" if dry_run else "PLAN"} {item.destination}: {item.reason}')
     if dry_run:
+        if preserved and not preserve_custom_filters:
+            print('REQUIRES REVIEW: a real installation will stop unless --preserve-custom-filters is specified')
         print('DRY RUN: no file modifications, reload or lock creation')
         return
+    if preserved and not preserve_custom_filters:
+        raise UpdateError('Customized filters require manual review; no files changed. '
+                          'To update other managed files while keeping these filters unchanged, '
+                          'rerun with --preserve-custom-filters.')
     if not shutil.which('fail2ban-client'):
         raise UpdateError('fail2ban-client not found')
     if not changes:
-        print('Already up to date; no changes necessary')
+        if preserved:
+            print('PARTIAL: no managed changes; customized filters remain unchanged and unupgraded')
+        else:
+            print('Already up to date; no changes necessary')
         return
     f2b('-t')
     base.mkdir(parents=True,exist_ok=True)
@@ -314,15 +328,19 @@ def run(dry_run: bool=False) -> None:
                 raise UpdateError('UPDATE FAILED; rollback INCOMPLETE: '+'; '.join(errors)+f'. Backup: {backup}') from exc
             raise UpdateError(f'UPDATE FAILED; previous files restored automatically. Backup: {backup}; cause: {exc}') from exc
         print(f'SUCCESS; backup available at {backup}')
+        if preserved:
+            print('PARTIAL UPDATE: customized filters were preserved; bundled filter rules NOT activated for them')
         print('NOTICE: MiniSOC application is not restarted. Reload its signature cache separately if necessary.')
 
 
 def main() -> int:
     parser=argparse.ArgumentParser(description='Safe update of Fail2Ban and MiniSOC rules')
     parser.add_argument('--dry-run',action='store_true',help='preview only, no mutations')
+    parser.add_argument('--preserve-custom-filters',action='store_true',
+                        help='explicitly allow a partial update while leaving unknown custom filters unchanged')
     args=parser.parse_args()
     try:
-        run(args.dry_run)
+        run(args.dry_run,args.preserve_custom_filters)
     except (OSError,UpdateError) as exc:
         print('ERROR:',exc,file=sys.stderr)
         return 1

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.3 — 2026-11-21
+
+- Fix the v1.3.2 updater's hard-coded `.git` regex fingerprint, which rejected legitimate locally customized `nginx-skanery.conf` filters even when Git was installed.
+- Evaluate clean three-way merges against all bundled, verified historical baselines (including v1.3.2), and require the incoming upstream `failregex` to survive the merge verbatim.
+- Report incompatible or unknown custom filters during `--dry-run` without writing to the system. Normal installation still stops before making changes unless the operator explicitly chooses `--preserve-custom-filters`.
+- In explicit partial-update mode, leave unknown custom filters byte-for-byte unchanged and warn that the newest bundled filter rules are **not** activated for those filters. Other managed files can be updated with the existing backup, validation, and rollback safeguards.
+- Add regression tests reproducing a custom `(config|HEAD)` regex spelling, partial-update safety, version v1.3.2 baseline upgrades, and automatic rollback without touching custom filters.
+- No new one-hit blocking signatures or jail policy changes in this maintenance release.
+
 ## 1.3.2 — 2026-11-21
 
 - Add narrowly scoped rules for encoded environment-file traversal, root SQL backup discovery, sensitive service-account and Streamlit paths; preserve broad discovery patterns as review-only candidates.
